@@ -26,10 +26,10 @@ implementable and testable.
 
 **Purpose**: Project initialization and structure.
 
-- [ ] T001 Create the hexagonal project structure per plan.md: `src/distil/{domain,ports,services,adapters/{persistence/sqlite,graph/networkx,llm/gemini,parsing},api}`, `tests/{unit,integration,contract,_fakes}`, `evals/{datasets,harness}` (with `__init__.py` where needed)
-- [ ] T002 Initialize uv project in `pyproject.toml` (Python 3.12): runtime deps `fastapi`, `uvicorn[standard]`, `pydantic>=2`, `networkx`, `pymupdf`, `google-genai`; dev deps `pytest`, `ruff`, `mypy`; then `uv sync`
-- [ ] T003 [P] Configure `ruff` (lint + format) and `mypy` (strict-ish) in `pyproject.toml`
-- [ ] T004 [P] Implement `src/distil/config.py` loading settings from env/`.env` (`GEMINI_API_KEY`, `GEMINI_MODEL` default `gemini-3-flash`, `DISTIL_DB_PATH` default `./data/distil.db`); add `.env.example` (placeholders only, no secret)
+- [x] T001 Create the hexagonal project structure per plan.md: `src/distil/{domain,ports,services,adapters/{persistence/sqlite,graph/networkx,llm/gemini,parsing},api}`, `tests/{unit,integration,contract,_fakes}`, `evals/{datasets,harness}` (with `__init__.py` where needed)
+- [x] T002 Initialize uv project in `pyproject.toml` (Python 3.12): runtime deps `fastapi`, `uvicorn[standard]`, `pydantic>=2`, `networkx`, `pymupdf`, `google-genai`; dev deps `pytest`, `ruff`, `mypy`; then `uv sync`
+- [x] T003 [P] Configure `ruff` (lint + format) and `mypy` (strict-ish) in `pyproject.toml`
+- [x] T004 [P] Implement `src/distil/config.py` loading settings from env/`.env` (`GEMINI_API_KEY`, `GEMINI_MODEL` default `gemini-3-flash`, `DISTIL_DB_PATH` default `./data/distil.db`); add `.env.example` (placeholders only, no secret)
 
 **Checkpoint**: Project installs and lints; config loads from env.
 

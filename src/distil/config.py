@@ -1,0 +1,52 @@
+"""Application configuration.
+
+Settings are loaded from environment variables (or a local ``.env`` file) and validated once.
+Secrets (the Gemini API key) never have hard-coded defaults and are never committed — see the
+project constitution, Principle V. Call :func:`get_settings` to obtain the cached instance.
+"""
+
+from __future__ import annotations
+
+from functools import lru_cache
+from pathlib import Path
+
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    """Runtime configuration, sourced from the environment / ``.env``.
+
+    Field names map to upper-case environment variables
+    (e.g. ``gemini_api_key`` ← ``GEMINI_API_KEY``).
+    """
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+        case_sensitive=False,
+    )
+
+    # LLM provider (Gemini free tier for the MVP; swappable behind the LLM provider port).
+    gemini_api_key: str = Field(
+        default="",
+        description="Google Gemini API key. Required for real LLM calls; left empty keeps imports "
+        "and non-LLM tests working. The Gemini adapter checks it is set before use.",
+    )
+    gemini_model: str = Field(
+        default="gemini-3-flash",
+        description="Gemini model id. Confirm the exact free-tier string + limits in AI Studio.",
+    )
+
+    # Local persistence (SQLite source of truth for v1).
+    distil_db_path: Path = Field(
+        default=Path("./data/distil.db"),
+        description="Filesystem path to the local SQLite database.",
+    )
+
+
+@lru_cache(maxsize=1)
+def get_settings() -> Settings:
+    """Return the cached :class:`Settings`, reading the environment on first call."""
+    return Settings()
