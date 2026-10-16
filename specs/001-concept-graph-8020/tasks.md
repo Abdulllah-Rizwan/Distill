@@ -70,7 +70,7 @@ implementable and testable.
 - [ ] T018 [P] [US1] Contract test `GET /api/v1/vital-few` and `GET /api/v1/concepts/{id}` incl. the faithfulness guarantee (every entry has non-empty `evidence`; each `quote == content[start:end]`) in `tests/contract/test_vital_few.py`
 - [ ] T019 [P] [US1] End-to-end integration test with `FakeExtractor`/`FakeRanker`: upload markdown + text → `vital-few` returns ranked explained entries with provenance, in `tests/integration/test_pipeline_us1.py`
 - [x] T020 [P] [US1] Unit tests for parsers (text, markdown, PDF incl. no-text rejection) in `tests/unit/test_parsers.py`
-- [ ] T021 [P] [US1] Unit test graph-signal computation (degree, PageRank, recurrence) in `tests/unit/test_graph_signals.py`
+- [x] T021 [P] [US1] Unit test graph-signal computation (degree, PageRank, recurrence) in `tests/unit/test_graph_signals.py`
 
 ### Implementation for User Story 1
 
@@ -78,11 +78,11 @@ implementable and testable.
 - [x] T023 [P] [US1] Implement PDF `FileParser` (PyMuPDF) in `src/distil/adapters/parsing/pdf.py`: extract text + `page_map`; detect and reject image-only/no-text PDFs (→ `rejected`)
 - [x] T024 [US1] Implement ingestion service in `src/distil/services/ingestion.py`: parse → `Material`, set `status`, dedup by `content_hash` (FR-014) (depends on T022, T023, T011)
 - [ ] T025 [US1] Implement Gemini `ConceptExtractor` in `src/distil/adapters/llm/gemini/extractor.py`: structured output requiring a provenance span per concept/relationship; chunk long text with overlap; throttle + exponential backoff for free-tier rate limits; drop any item whose `quote` ≠ source slice (depends on T009)
-- [ ] T026 [US1] Implement concept/relationship merge + dedup across chunks and materials in `src/distil/services/graph_builder.py` (depends on T025)
-- [ ] T027 [US1] Implement NetworkX `GraphAnalyzer` in `src/distil/adapters/graph/networkx/analyzer.py`: build graph, compute degree + PageRank centrality, set `recurrence_count` (depends on T009)
+- [x] T026 [US1] Implement concept/relationship merge + dedup across chunks and materials in `src/distil/services/graph_builder.py` (depends on T025)
+- [x] T027 [US1] Implement NetworkX `GraphAnalyzer` in `src/distil/adapters/graph/networkx/analyzer.py`: build graph, compute degree + PageRank centrality, set `recurrence_count` (depends on T009)
 - [ ] T028 [US1] Implement Gemini `Ranker` in `src/distil/adapters/llm/gemini/ranker.py`: produce ordered `VitalFewEntry`s with `signals` + plain `rationale` + `evidence`; create `RankingRun`; enforce `vital_few_size ≤ 25%` cap (depends on T009)
 - [ ] T029 [US1] Implement batch pipeline orchestration (ingest → extract → merge → build graph → rank) triggered on upload, in `src/distil/services/pipeline.py` (depends on T024–T028)
-- [ ] T030 [US1] Implement a provenance validator applied before persisting ANY concept/edge/entry (`quote == content[start:end]`, else drop/flag) in `src/distil/services/provenance.py` — enforces Source-Faithfulness (depends on T005)
+- [x] T030 [US1] Implement a provenance validator applied before persisting ANY concept/edge/entry (`quote == content[start:end]`, else drop/flag) in `src/distil/services/provenance.py` — enforces Source-Faithfulness (depends on T005)
 - [ ] T031 [US1] Implement `POST /api/v1/materials` + `GET /api/v1/materials` in `src/distil/api/routers/materials.py` (depends on T024, T029)
 - [ ] T032 [US1] Implement `GET /api/v1/vital-few` + `GET /api/v1/concepts/{id}` in `src/distil/api/routers/vital_few.py`: guarantee non-empty `sources`/`evidence`; return empty list + explanatory `note` for too-small corpus (depends on T029)
 - [ ] T033 [US1] Wire US1 routers into the app and make T017–T019 pass (depends on T031, T032)
