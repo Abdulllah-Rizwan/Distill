@@ -46,13 +46,13 @@ implementable and testable.
 - [x] T007 [P] Define `Concept` (`src/distil/domain/concept.py`) and `Relationship` (`src/distil/domain/relationship.py`): Concept requires `len(sources) ≥ 1` and `recurrence_count ≥ 1`; Relationship requires `source_concept_id != target_concept_id`, `len(sources) ≥ 1`, and no duplicate `(pair, kind)` (merge sources instead)
 - [x] T008 [P] Define `VitalFewEntry` and `RankingRun` in `src/distil/domain/ranking.py`: VitalFewEntry requires `rank ≥ 1` unique within a run, non-empty `rationale`, `len(evidence) ≥ 1`; RankingRun requires `vital_few_size ≤ cap` (target ≤ 25% of total concepts, per SC-004)
 - [x] T009 Define port interfaces (Protocols/ABCs) in `src/distil/ports/`: `MaterialRepository`, `GraphRepository`, `FileParser`, `ConceptExtractor`, `Ranker`, `GraphAnalyzer` (depends on T005–T008)
-- [ ] T010 Create SQLite schema + connection/init in `src/distil/adapters/persistence/sqlite/schema.py` (tables for workspace, material, concept + concept_source, relationship + relationship_source, ranking_run, vital_few_entry + vital_few_evidence; every row carries `workspace_id`; `content_hash` unique per `(workspace_id)`)
-- [ ] T011 Implement SQLite `MaterialRepository` + `GraphRepository` in `src/distil/adapters/persistence/sqlite/repositories.py`; **every query scoped by `workspace_id`** (depends on T009, T010)
+- [x] T010 Create SQLite schema + connection/init in `src/distil/adapters/persistence/sqlite/schema.py` (tables for workspace, material, concept + concept_source, relationship + relationship_source, ranking_run, vital_few_entry + vital_few_evidence; every row carries `workspace_id`; `content_hash` unique per `(workspace_id)`)
+- [x] T011 Implement SQLite `MaterialRepository` + `GraphRepository` in `src/distil/adapters/persistence/sqlite/repositories.py`; **every query scoped by `workspace_id`** (depends on T009, T010)
 - [ ] T012 [P] Implement `FakeExtractor` + `FakeRanker` test doubles in `tests/_fakes/llm.py` (deterministic, implement the LLM ports) so integration tests run with no network and no cost
 - [ ] T013 FastAPI app skeleton in `src/distil/api/main.py`: base path `/api/v1`, consistent error envelope `{"error":{"code","message"}}`, dependency wiring that injects adapters via ports (depends on T009)
 - [ ] T014 [P] Logging + error-handling infrastructure (structured logs, never logging secrets or full user content)
 - [x] T015 [P] Unit test `SourceReference` provenance validation (offset bounds + `quote == slice`) in `tests/unit/test_source_reference.py`
-- [ ] T016 Integration test workspace isolation (repositories never return cross-workspace rows) in `tests/integration/test_workspace_isolation.py` (depends on T011)
+- [x] T016 Integration test workspace isolation (repositories never return cross-workspace rows) in `tests/integration/test_workspace_isolation.py` (depends on T011)
 
 **Checkpoint**: Domain + ports + SQLite + app skeleton ready; faithfulness check and isolation proven.
 

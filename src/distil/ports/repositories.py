@@ -59,8 +59,6 @@ class GraphRepository(Protocol):
 
     def save_ranking(self, run: RankingRun, entries: Sequence[VitalFewEntry]) -> None: ...
 
-    def latest_ranking(
-        self, workspace_id: str
-    ) -> tuple[RankingRun, list[VitalFewEntry]] | None:
+    def latest_ranking(self, workspace_id: str) -> tuple[RankingRun, list[VitalFewEntry]] | None:
         """The most recent ranking run and its entries, or None if none computed yet."""
         ...
