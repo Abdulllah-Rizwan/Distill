@@ -55,9 +55,21 @@ in `decisions.md`; this file tracks *activity and todos* only.
   sources) ✅; **batch pipeline** (ingest → rebuild graph → rank → persist, T029) ✅; **US1 API**
   (POST/GET `/materials`, GET `/vital-few`, GET `/concepts/{id}`, T031–T033) ✅ with a composition
   root injecting adapters behind ports; **contract + E2E tests** (T017/T018/T019) ✅.
-  **Remaining for a real run:** Gemini extractor + ranker adapters (T025/T028) — the service/port
-  seam is done, only the Gemini classes behind the `ConceptExtractor`/`Ranker` ports are left.
-- **48 tests passing** (was 28). Added `python-multipart` (FastAPI upload parsing).
+- **Ranking refactor (post-MVP):** split the old `Ranker` port into a prose-only `Explainer` port
+  and moved all ordering into `services/ranking.py` — deterministic composite of normalised
+  PageRank (0.5) + degree (0.25) + recurrence (0.25), ties broken by label. The LLM now only writes
+  the rationale for already-chosen concepts; it **cannot** reorder (Principle II). Signal weights are
+  the eval-tunable knob (T044/T045).
+- **Gemini adapters landed (T025/T028):** `src/distil/adapters/llm/gemini/` — `prompts.py` (the two
+  reviewed prompts + Pydantic structured-output schemas, in source per Principle VII); `_client.py`
+  (`GeminiClient` over google-genai 2.31, `temperature=0`, `with_retries` exponential backoff on
+  429/5xx — a pure, unit-tested policy); `extractor.py` (model returns verbatim quotes only, adapter
+  locates each via `find`, computes absolute offsets across overlapping chunks, builds a faithful
+  `SourceReference`, drops anything not found — malformed response skips the chunk, not the ingest);
+  `explainer.py` (single batched call, blank/missing → service fallback). `build_gemini_provider`
+  raises `ValueError` if `GEMINI_API_KEY` is unset; wired into `build_llm_provider`.
+- **64 tests passing** (was 48; +13 offline adapter tests via a scripted fake `JsonLLM`, +others).
+  Added `python-multipart` (FastAPI upload parsing). `google-genai` already a declared dep.
 - Notable choices this chunk: `MIN_CONCEPTS_FOR_VITAL_FEW = 5` (below it the vital-few view returns
   empty + an explanatory note rather than an arbitrary shortlist); SQLite opened with
   `check_same_thread=False` (documented — safe for v1 single-user/local, Postgres pool is the
@@ -70,13 +82,15 @@ in `decisions.md`; this file tracks *activity and todos* only.
   strict + pytest).
 
 ### Pick up here next
-1. **Design the Gemini extraction + ranking prompts together** (checkpoint reached — pausing here
-   for review per Principle IV before writing the adapters). Prompts live in source (Principle VII).
-2. Implement the Gemini `ConceptExtractor` (T025) + `Ranker` (T028) behind the existing ports:
-   structured output with a provenance span per item, chunking + overlap, rate-limit backoff, and
-   drop any item whose `quote` ≠ source slice. Wire into `build_llm_provider`.
-3. Confirm the exact `gemini-3-flash` API model string + live free-tier limits in AI Studio before
-   the first real call. Then US2 (graph endpoints), US3 (delete/rebuild), Polish (evals, T050/T051).
+1. **Before the first real Gemini call:** confirm the exact `gemini-3-flash` API model string + live
+   free-tier rate/token limits in AI Studio (sets chunk size); then do a single smoke run against the
+   author's own non-sensitive test notes (Principle V) to validate the prompts end-to-end. No live
+   call has been made yet — everything is green on fakes only.
+2. **US2 (T034–T038):** graph endpoints (concept graph view / neighborhood).
+3. **US3 (T039–T043):** material delete + graph/ranking rebuild.
+4. **Polish (T044–T051):** eval harness (faithfulness = 100% deterministic + relevance LLM-judge),
+   datasets, edge cases, README Principle V caveat, hardening, T050 quickstart vs real Gemini, T051
+   release gate. Tune signal weights + chunk size/overlap via evals.
 
 ### Open questions to resolve
 - Confirm the `gemini-3-flash` API model string + live free-tier rate limits (AI Studio).

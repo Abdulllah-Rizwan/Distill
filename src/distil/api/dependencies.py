@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 
 from distil.adapters.graph.networkx.analyzer import NetworkxGraphAnalyzer
+from distil.adapters.llm.gemini import build_gemini_provider
 from distil.adapters.parsing.pdf import PdfParser
 from distil.adapters.parsing.text import TextParser
 from distil.adapters.persistence.sqlite.repositories import (
@@ -57,17 +58,13 @@ def build_services(
 
 
 def build_llm_provider(settings: Settings) -> tuple[ConceptExtractor, Explainer]:
-    """Construct the real LLM adapters (Gemini).
+    """Construct the real LLM adapters (Gemini) behind the LLM ports.
 
-    Not implemented yet: the Gemini extractor (T025) and explainer (T028) are the next chunk, built
-    after their prompts are reviewed (Principle IV — understand before adopt). Until then the
-    production app cannot serve the LLM-backed routes; the test suite injects deterministic fakes
-    through ``app.dependency_overrides`` and never reaches this path.
+    Delegates to the Gemini adapter, which validates the API key and shares one client between the
+    extractor and explainer. Tests never reach this path — they inject deterministic fakes through
+    ``app.dependency_overrides`` — so no test touches the network or the real model (Principle VII).
     """
-    raise NotImplementedError(
-        "The Gemini LLM adapter is not implemented yet. Build the extractor/explainer in "
-        "distil.adapters.llm.gemini (tasks T025/T028) before serving the API against a real model."
-    )
+    return build_gemini_provider(settings)
 
 
 @lru_cache(maxsize=1)
