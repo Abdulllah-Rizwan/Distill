@@ -18,3 +18,10 @@ class ProvenanceError(DomainError):
     exact passage it claims. This is the enforcement point for Constitution Principle I
     (Source-Faithfulness): an item that fails this check must never be persisted as fact.
     """
+
+
+class UnsupportedContentError(DomainError):
+    """A material's content cannot be extracted faithfully (e.g. an image-only/scanned PDF).
+
+    Signals that the material must be rejected rather than guessed at (FR-002 / Principle I).
+    """

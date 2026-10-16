@@ -35,6 +35,22 @@ class PageSpan:
 
 
 @dataclass(frozen=True, slots=True)
+class ParsedContent:
+    """The result of parsing a raw upload: extracted text plus optional page provenance.
+
+    Produced by a :class:`~distil.ports.parsing.FileParser`, consumed by ingestion to build a
+    :class:`Material`. ``is_empty`` lets ingestion mark contentless uploads as ``EMPTY``.
+    """
+
+    content_text: str
+    page_map: tuple[PageSpan, ...] = ()
+
+    @property
+    def is_empty(self) -> bool:
+        return not self.content_text.strip()
+
+
+@dataclass(frozen=True, slots=True)
 class Material:
     """An uploaded note. ``content_text`` is the basis for every provenance span."""
 
