@@ -73,19 +73,26 @@ in `decisions.md`; this file tracks *activity and todos* only.
 - Notable choices this chunk: `MIN_CONCEPTS_FOR_VITAL_FEW = 5` (below it the vital-few view returns
   empty + an explanatory note rather than an arbitrary shortlist); SQLite opened with
   `check_same_thread=False` (documented — safe for v1 single-user/local, Postgres pool is the
-  multi-user path); `build_llm_provider` raises a clear `NotImplementedError` until the Gemini
-  adapter lands, so the app imports and the whole MVP is testable on fakes with no network/cost.
+  multi-user path). (`build_llm_provider` previously raised `NotImplementedError` as a placeholder;
+  it now delegates to `build_gemini_provider`.)
 
-### State of the repo
-- **Git repo on `main`**, ~14 commits. Constitution **v1.1.0**. Feature 001 specced + planned;
-  **US1 MVP wired end-to-end and green on the fake LLM.** Everything green (ruff + format + mypy
-  strict + pytest).
+### State of the repo (end of day)
+- **Git repo on `main`**, ~17 commits; latest `d18997d` (Gemini adapters). Constitution **v1.1.0**.
+- Feature 001 specced + planned; **US1 MVP wired end-to-end, now with the real Gemini adapters in
+  place** — but still **only exercised on the fake LLM**. No live Gemini call has been made (no key
+  loaded, Principle V preserved).
+- Everything green: `ruff check` + `ruff format --check` + `mypy --strict` + `pytest` (**64 passed**).
+- Working tree clean; all of today's work committed.
 
-### Pick up here next
-1. **Before the first real Gemini call:** confirm the exact `gemini-3-flash` API model string + live
-   free-tier rate/token limits in AI Studio (sets chunk size); then do a single smoke run against the
-   author's own non-sensitive test notes (Principle V) to validate the prompts end-to-end. No live
-   call has been made yet — everything is green on fakes only.
+### Pick up here tomorrow
+1. **First real Gemini call (the next real milestone).** Before it:
+   - Confirm in AI Studio the exact `gemini-3-flash` API model string **and** the live free-tier
+     rate/token limits — the TPM limit is what sets whether `DEFAULT_MAX_CHARS=6000` / `overlap=250`
+     in `extractor.py` are right.
+   - Put `GEMINI_API_KEY` in a local `.env` (gitignored — never commit it).
+   - Smoke-run a single upload of the **author's own non-sensitive test notes** (Principle V) through
+     `POST /materials` → `GET /vital-few`, and eyeball that quotes are faithful and rationales read
+     honestly. This is the first time the prompts meet a real model.
 2. **US2 (T034–T038):** graph endpoints (concept graph view / neighborhood).
 3. **US3 (T039–T043):** material delete + graph/ranking rebuild.
 4. **Polish (T044–T051):** eval harness (faithfulness = 100% deterministic + relevance LLM-judge),
