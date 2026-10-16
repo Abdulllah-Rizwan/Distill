@@ -1,0 +1,46 @@
+# === Secrets & environment (Constitution Principle V — never commit secrets) ===
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+secrets/
+
+# === Python ===
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+.eggs/
+build/
+dist/
+.Python
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+
+# === Local data stores (SQLite for v1 — local state, not shared) ===
+*.db
+*.sqlite
+*.sqlite3
+data/
+
+# === Editors / OS ===
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db

@@ -1,0 +1,17 @@
+# Normalize line endings: let Git decide text vs binary, store text as LF in the repo.
+* text=auto
+
+# Shell scripts MUST stay LF even on Windows checkouts, or they break when run.
+*.sh text eol=lf
+
+# Windows batch/PowerShell scripts expect CRLF.
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
+# Common binaries — never touch.
+*.png binary
+*.jpg binary
+*.pdf binary
+*.db binary
+*.sqlite binary
+*.sqlite3 binary
