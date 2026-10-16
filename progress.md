@@ -48,22 +48,35 @@ in `decisions.md`; this file tracks *activity and todos* only.
   incl. the `SourceReference` faithfulness check; ports (Protocols); SQLite schema + repositories
   (JSON columns, workspace-scoped); FakeExtractor/FakeRanker; FastAPI skeleton + error envelope;
   logging.
-- **Phase 3 US1 (MVP) — in progress:** parsers (text/md/PDF, T020/T022/T023) ✅; ingestion
-  (T024) ✅; provenance gate + graph builder/merge + NetworkX signals (T021/T026/T027/T030) ✅.
-  **Remaining:** ranking service + pipeline orchestration (T028/T029), API endpoints
-  (T031/T032/T033), contract + E2E tests (T017/T018/T019), real Gemini extractor/ranker adapters
-  (T025/T028).
-- **28 tests passing.** numpy/scipy added as networkx's PageRank backend.
+- **Phase 3 US1 (MVP) — functionally complete on the fake LLM:** parsers (text/md/PDF,
+  T020/T022/T023) ✅; ingestion (T024) ✅; provenance gate + graph builder/merge + NetworkX signals
+  (T021/T026/T027/T030) ✅; **ranking service** (Pareto cut ~20%, SC-004 hard cap ≤25%, builds
+  `RankingRun`/`VitalFewEntry`, evidence provenance gate with fallback to grounded concept
+  sources) ✅; **batch pipeline** (ingest → rebuild graph → rank → persist, T029) ✅; **US1 API**
+  (POST/GET `/materials`, GET `/vital-few`, GET `/concepts/{id}`, T031–T033) ✅ with a composition
+  root injecting adapters behind ports; **contract + E2E tests** (T017/T018/T019) ✅.
+  **Remaining for a real run:** Gemini extractor + ranker adapters (T025/T028) — the service/port
+  seam is done, only the Gemini classes behind the `ConceptExtractor`/`Ranker` ports are left.
+- **48 tests passing** (was 28). Added `python-multipart` (FastAPI upload parsing).
+- Notable choices this chunk: `MIN_CONCEPTS_FOR_VITAL_FEW = 5` (below it the vital-few view returns
+  empty + an explanatory note rather than an arbitrary shortlist); SQLite opened with
+  `check_same_thread=False` (documented — safe for v1 single-user/local, Postgres pool is the
+  multi-user path); `build_llm_provider` raises a clear `NotImplementedError` until the Gemini
+  adapter lands, so the app imports and the whole MVP is testable on fakes with no network/cost.
 
 ### State of the repo
-- **Git repo on `main`**, ~13 commits. Constitution **v1.1.0**. Feature 001 specced + planned +
-  ~65% of the MVP built. Everything green.
+- **Git repo on `main`**, ~14 commits. Constitution **v1.1.0**. Feature 001 specced + planned;
+  **US1 MVP wired end-to-end and green on the fake LLM.** Everything green (ruff + format + mypy
+  strict + pytest).
 
 ### Pick up here next
-1. Ranking service + pipeline orchestration (ingest → extract → build → rank → persist).
-2. API endpoints (POST/GET /materials, GET /vital-few, /concepts/{id}) + contract/E2E tests → MVP.
-3. Real **Gemini 3 Flash** extractor + ranker adapters (prompts in source per Principle VII; worth a
-   review). Confirm the exact API model string + live free-tier limits in AI Studio before first call.
+1. **Design the Gemini extraction + ranking prompts together** (checkpoint reached — pausing here
+   for review per Principle IV before writing the adapters). Prompts live in source (Principle VII).
+2. Implement the Gemini `ConceptExtractor` (T025) + `Ranker` (T028) behind the existing ports:
+   structured output with a provenance span per item, chunking + overlap, rate-limit backoff, and
+   drop any item whose `quote` ≠ source slice. Wire into `build_llm_provider`.
+3. Confirm the exact `gemini-3-flash` API model string + live free-tier limits in AI Studio before
+   the first real call. Then US2 (graph endpoints), US3 (delete/rebuild), Polish (evals, T050/T051).
 
 ### Open questions to resolve
 - Confirm the `gemini-3-flash` API model string + live free-tier rate limits (AI Studio).
