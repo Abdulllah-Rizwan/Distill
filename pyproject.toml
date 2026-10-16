@@ -50,6 +50,12 @@ warn_unused_configs = true
 warn_redundant_casts = true
 warn_unused_ignores = true
 
+# PyMuPDF ships only partial type information, so calls into it read as "untyped" under strict
+# mode. Confine that relaxation to the one adapter that touches the library.
+[[tool.mypy.overrides]]
+module = "distil.adapters.parsing.pdf"
+disable_error_code = ["no-untyped-call"]
+
 [tool.pytest.ini_options]
 pythonpath = ["."]          # lets tests import the `tests._fakes` helpers
 testpaths = ["tests"]
