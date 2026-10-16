@@ -13,6 +13,21 @@ from distil.domain.concept import Concept
 from distil.domain.material import Material
 from distil.domain.ranking import RankingRun, VitalFewEntry
 from distil.domain.relationship import Relationship
+from distil.domain.workspace import Workspace
+
+
+class WorkspaceRepository(Protocol):
+    """Stores workspaces — the isolation boundary every other row is scoped to."""
+
+    def ensure(self, workspace_id: str) -> Workspace:
+        """Return the workspace, creating it on first use.
+
+        v1 is single-user/local with no sign-up step, so a workspace springs into existence the
+        first time it is referenced (e.g. the first upload). Idempotent.
+        """
+        ...
+
+    def get(self, workspace_id: str) -> Workspace | None: ...
 
 
 class MaterialRepository(Protocol):

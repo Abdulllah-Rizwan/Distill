@@ -66,9 +66,9 @@ implementable and testable.
 
 ### Tests for User Story 1 (write first, ensure they FAIL)
 
-- [ ] T017 [P] [US1] Contract test `POST /api/v1/materials` (201 accepted / 200 duplicate / 202 empty / 415 unsupported) in `tests/contract/test_materials_post.py`
-- [ ] T018 [P] [US1] Contract test `GET /api/v1/vital-few` and `GET /api/v1/concepts/{id}` incl. the faithfulness guarantee (every entry has non-empty `evidence`; each `quote == content[start:end]`) in `tests/contract/test_vital_few.py`
-- [ ] T019 [P] [US1] End-to-end integration test with `FakeExtractor`/`FakeRanker`: upload markdown + text → `vital-few` returns ranked explained entries with provenance, in `tests/integration/test_pipeline_us1.py`
+- [x] T017 [P] [US1] Contract test `POST /api/v1/materials` (201 accepted / 200 duplicate / 202 empty / 415 unsupported) in `tests/contract/test_materials_post.py`
+- [x] T018 [P] [US1] Contract test `GET /api/v1/vital-few` and `GET /api/v1/concepts/{id}` incl. the faithfulness guarantee (every entry has non-empty `evidence`; each `quote == content[start:end]`) in `tests/contract/test_vital_few.py`
+- [x] T019 [P] [US1] End-to-end integration test with `FakeExtractor`/`FakeRanker`: upload markdown + text → `vital-few` returns ranked explained entries with provenance, in `tests/integration/test_pipeline_us1.py`
 - [x] T020 [P] [US1] Unit tests for parsers (text, markdown, PDF incl. no-text rejection) in `tests/unit/test_parsers.py`
 - [x] T021 [P] [US1] Unit test graph-signal computation (degree, PageRank, recurrence) in `tests/unit/test_graph_signals.py`
 
@@ -80,12 +80,12 @@ implementable and testable.
 - [ ] T025 [US1] Implement Gemini `ConceptExtractor` in `src/distil/adapters/llm/gemini/extractor.py`: structured output requiring a provenance span per concept/relationship; chunk long text with overlap; throttle + exponential backoff for free-tier rate limits; drop any item whose `quote` ≠ source slice (depends on T009)
 - [x] T026 [US1] Implement concept/relationship merge + dedup across chunks and materials in `src/distil/services/graph_builder.py` (depends on T025)
 - [x] T027 [US1] Implement NetworkX `GraphAnalyzer` in `src/distil/adapters/graph/networkx/analyzer.py`: build graph, compute degree + PageRank centrality, set `recurrence_count` (depends on T009)
-- [ ] T028 [US1] Implement Gemini `Ranker` in `src/distil/adapters/llm/gemini/ranker.py`: produce ordered `VitalFewEntry`s with `signals` + plain `rationale` + `evidence`; create `RankingRun`; enforce `vital_few_size ≤ 25%` cap (depends on T009)
-- [ ] T029 [US1] Implement batch pipeline orchestration (ingest → extract → merge → build graph → rank) triggered on upload, in `src/distil/services/pipeline.py` (depends on T024–T028)
+- [ ] T028 [US1] Implement Gemini `Ranker` in `src/distil/adapters/llm/gemini/ranker.py`: produce ordered `VitalFewEntry`s with `signals` + plain `rationale` + `evidence`; create `RankingRun`; enforce `vital_few_size ≤ 25%` cap (depends on T009) — **the ranking _service_ (cap + `RankingRun`/`VitalFewEntry` construction + evidence provenance gate) is done in `src/distil/services/ranking.py`; only the Gemini adapter behind the `Ranker` port remains**
+- [x] T029 [US1] Implement batch pipeline orchestration (ingest → extract → merge → build graph → rank) triggered on upload, in `src/distil/services/pipeline.py` (depends on T024–T028)
 - [x] T030 [US1] Implement a provenance validator applied before persisting ANY concept/edge/entry (`quote == content[start:end]`, else drop/flag) in `src/distil/services/provenance.py` — enforces Source-Faithfulness (depends on T005)
-- [ ] T031 [US1] Implement `POST /api/v1/materials` + `GET /api/v1/materials` in `src/distil/api/routers/materials.py` (depends on T024, T029)
-- [ ] T032 [US1] Implement `GET /api/v1/vital-few` + `GET /api/v1/concepts/{id}` in `src/distil/api/routers/vital_few.py`: guarantee non-empty `sources`/`evidence`; return empty list + explanatory `note` for too-small corpus (depends on T029)
-- [ ] T033 [US1] Wire US1 routers into the app and make T017–T019 pass (depends on T031, T032)
+- [x] T031 [US1] Implement `POST /api/v1/materials` + `GET /api/v1/materials` in `src/distil/api/routers/materials.py` (depends on T024, T029)
+- [x] T032 [US1] Implement `GET /api/v1/vital-few` + `GET /api/v1/concepts/{id}` in `src/distil/api/routers/vital_few.py`: guarantee non-empty `sources`/`evidence`; return empty list + explanatory `note` for too-small corpus (depends on T029)
+- [x] T033 [US1] Wire US1 routers into the app and make T017–T019 pass (depends on T031, T032)
 
 **Checkpoint**: MVP — a student can upload notes and get the explained, source-linked vital-few view.
 

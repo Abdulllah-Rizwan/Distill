@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from collections.abc import Sequence
-from datetime import datetime
+from datetime import UTC, datetime
 
 from distil.adapters.persistence.sqlite._serde import (
     page_map_from_json,
@@ -17,6 +17,7 @@ from distil.domain.concept import Concept
 from distil.domain.material import Material, MaterialFormat, MaterialStatus
 from distil.domain.ranking import RankingRun, VitalFewEntry
 from distil.domain.relationship import Relationship
+from distil.domain.workspace import Workspace
 
 
 def _row_to_material(row: sqlite3.Row) -> Material:
@@ -56,6 +57,39 @@ def _row_to_relationship(row: sqlite3.Row) -> Relationship:
         sources=sources_from_json(row["sources"]),
         kind=row["kind"],
     )
+
+
+class SqliteWorkspaceRepository:
+    """:class:`~distil.ports.repositories.WorkspaceRepository` backed by SQLite."""
+
+    def __init__(self, conn: sqlite3.Connection) -> None:
+        self._conn = conn
+
+    def ensure(self, workspace_id: str) -> Workspace:
+        existing = self.get(workspace_id)
+        if existing is not None:
+            return existing
+        created_at = datetime.now(UTC)
+        # INSERT OR IGNORE keeps this idempotent under the PK even if two calls race.
+        self._conn.execute(
+            "INSERT OR IGNORE INTO workspace (id, name, created_at) VALUES (?, ?, ?)",
+            (workspace_id, workspace_id, created_at.isoformat()),
+        )
+        self._conn.commit()
+        workspace = self.get(workspace_id)
+        if workspace is None:  # pragma: no cover - the row was just inserted
+            raise RuntimeError(f"Failed to create workspace {workspace_id!r}")
+        return workspace
+
+    def get(self, workspace_id: str) -> Workspace | None:
+        row = self._conn.execute("SELECT * FROM workspace WHERE id = ?", (workspace_id,)).fetchone()
+        if row is None:
+            return None
+        return Workspace(
+            id=row["id"],
+            name=row["name"],
+            created_at=datetime.fromisoformat(row["created_at"]),
+        )
 
 
 class SqliteMaterialRepository:

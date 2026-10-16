@@ -80,10 +80,15 @@ def connect(db_path: Path | str) -> sqlite3.Connection:
     """Open a SQLite connection with row access by name and foreign keys enforced.
 
     ``db_path`` may be ``":memory:"`` for tests; a file path's parent directory is created.
+
+    ``check_same_thread=False``: the web layer serves sync routes from a worker thread while the
+    connection is created elsewhere, so the single shared connection must be usable across threads.
+    This is safe for v1's single-user/local scope — requests are low-concurrency and SQLite
+    serializes writes internally. The multi-user target (Postgres) uses a per-request session pool.
     """
     if db_path != ":memory:":
         Path(db_path).parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect(db_path, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     return conn

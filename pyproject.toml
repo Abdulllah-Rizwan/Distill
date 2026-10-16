@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115",
+    "python-multipart>=0.0.12",  # FastAPI multipart/form-data parsing for file uploads
     "uvicorn[standard]>=0.32",
     "pydantic>=2.9",
     "pydantic-settings>=2.6",
@@ -44,6 +45,17 @@ src = ["src", "tests"]
 # pycodestyle(E/W), pyflakes(F), isort(I), pep8-naming(N), pyupgrade(UP),
 # flake8-bugbear(B), comprehensions(C4), simplify(SIM).
 select = ["E", "W", "F", "I", "N", "UP", "B", "C4", "SIM"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI's dependency/param markers are designed to be called in argument defaults; this is the
+# framework's idiom, not the B008 mutable-default bug.
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.File",
+    "fastapi.Form",
+    "fastapi.Query",
+    "fastapi.Path",
+]
 
 [tool.mypy]
 python_version = "3.12"

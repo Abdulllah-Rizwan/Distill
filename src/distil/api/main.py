@@ -9,6 +9,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 
 from distil.api.errors import register_exception_handlers
+from distil.api.routers import materials, vital_few
 from distil.logging_setup import configure_logging
 
 
@@ -26,7 +27,10 @@ def create_app() -> FastAPI:
     def health() -> dict[str, str]:
         return {"status": "ok"}
 
-    # US1/US2/US3 routers are wired here as they are implemented.
+    # US1 routers. Adapters are injected via the `get_services` dependency (dependencies.py);
+    # tests override it with fakes. US2/US3 routers are wired here as they are implemented.
+    app.include_router(materials.router)
+    app.include_router(vital_few.router)
     return app
 
 
