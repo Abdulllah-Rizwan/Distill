@@ -39,20 +39,35 @@ in `decisions.md`; this file tracks *activity and todos* only.
   products → MVP only with the author's own non-sensitive test notes; not for real student data until
   on a paid/no-training tier.
 
+### Implementation progress (feature 001)
+- Ran `/speckit-tasks` → 51 tasks. Building incrementally, committing each verified chunk (ruff +
+  mypy + pytest green at every commit).
+- **Phase 1 Setup (T001–T004): done** — uv project (Python 3.12), hexagonal layout, ruff/mypy/pytest
+  config, pydantic-settings config, `.env.example`, README.
+- **Phase 2 Foundational (T005–T016): done** — domain entities (frozen dataclasses) with invariants
+  incl. the `SourceReference` faithfulness check; ports (Protocols); SQLite schema + repositories
+  (JSON columns, workspace-scoped); FakeExtractor/FakeRanker; FastAPI skeleton + error envelope;
+  logging.
+- **Phase 3 US1 (MVP) — in progress:** parsers (text/md/PDF, T020/T022/T023) ✅; ingestion
+  (T024) ✅; provenance gate + graph builder/merge + NetworkX signals (T021/T026/T027/T030) ✅.
+  **Remaining:** ranking service + pipeline orchestration (T028/T029), API endpoints
+  (T031/T032/T033), contract + E2E tests (T017/T018/T019), real Gemini extractor/ranker adapters
+  (T025/T028).
+- **28 tests passing.** numpy/scipy added as networkx's PageRank backend.
+
 ### State of the repo
-- **Git repo on `main`**, 2 commits. Constitution **v1.1.0** (8 principles). First feature fully
-  specced + planned (`specs/001-concept-graph-8020/`). **No application code yet.**
+- **Git repo on `main`**, ~13 commits. Constitution **v1.1.0**. Feature 001 specced + planned +
+  ~65% of the MVP built. Everything green.
 
 ### Pick up here next
-1. **Run `/speckit-tasks`** to generate the dependency-ordered task list for implementation.
-2. Then `/speckit-implement` (or build incrementally), starting with the core domain + ports and the
-   fake-LLM test path so faithfulness is testable from day one.
-3. Confirm the exact `gemini-3-flash` API string + live free-tier limits in AI Studio before the
-   first real LLM call.
+1. Ranking service + pipeline orchestration (ingest → extract → build → rank → persist).
+2. API endpoints (POST/GET /materials, GET /vital-few, /concepts/{id}) + contract/E2E tests → MVP.
+3. Real **Gemini 3 Flash** extractor + ranker adapters (prompts in source per Principle VII; worth a
+   review). Confirm the exact API model string + live free-tier limits in AI Studio before first call.
 
 ### Open questions to resolve
 - Confirm the `gemini-3-flash` API model string + live free-tier rate limits (AI Studio).
-- Centrality measure + signal weighting for the 80/20 (start degree + PageRank; tune via evals).
+- Signal weighting for the 80/20 (degree + PageRank in; tune via evals).
 - Chunk size / overlap for extraction (set from model context window + free-tier TPM).
 
 ---
