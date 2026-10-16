@@ -76,7 +76,7 @@ implementable and testable.
 
 - [x] T022 [P] [US1] Implement text + Markdown `FileParser` in `src/distil/adapters/parsing/text.py` (preserve char offsets for provenance)
 - [x] T023 [P] [US1] Implement PDF `FileParser` (PyMuPDF) in `src/distil/adapters/parsing/pdf.py`: extract text + `page_map`; detect and reject image-only/no-text PDFs (→ `rejected`)
-- [ ] T024 [US1] Implement ingestion service in `src/distil/services/ingestion.py`: parse → `Material`, set `status`, dedup by `content_hash` (FR-014) (depends on T022, T023, T011)
+- [x] T024 [US1] Implement ingestion service in `src/distil/services/ingestion.py`: parse → `Material`, set `status`, dedup by `content_hash` (FR-014) (depends on T022, T023, T011)
 - [ ] T025 [US1] Implement Gemini `ConceptExtractor` in `src/distil/adapters/llm/gemini/extractor.py`: structured output requiring a provenance span per concept/relationship; chunk long text with overlap; throttle + exponential backoff for free-tier rate limits; drop any item whose `quote` ≠ source slice (depends on T009)
 - [ ] T026 [US1] Implement concept/relationship merge + dedup across chunks and materials in `src/distil/services/graph_builder.py` (depends on T025)
 - [ ] T027 [US1] Implement NetworkX `GraphAnalyzer` in `src/distil/adapters/graph/networkx/analyzer.py`: build graph, compute degree + PageRank centrality, set `recurrence_count` (depends on T009)
