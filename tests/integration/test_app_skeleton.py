@@ -8,8 +8,8 @@ from fastapi.testclient import TestClient
 
 from distil.api.main import create_app
 from distil.domain.material import Material, MaterialFormat, MaterialStatus
-from distil.ports.llm import ConceptExtractor, Ranker
-from tests._fakes.llm import FakeExtractor, FakeRanker
+from distil.ports.llm import ConceptExtractor, Explainer
+from tests._fakes.llm import FakeExplainer, FakeExtractor
 
 
 def test_health_endpoint_ok() -> None:
@@ -22,8 +22,8 @@ def test_health_endpoint_ok() -> None:
 def test_fakes_satisfy_ports_structurally() -> None:
     # Structural typing: the fakes are usable wherever the ports are expected.
     extractor: ConceptExtractor = FakeExtractor(["Alpha", "Beta"])
-    ranker: Ranker = FakeRanker()
-    assert extractor is not None and ranker is not None
+    explainer: Explainer = FakeExplainer()
+    assert extractor is not None and explainer is not None
 
 
 def test_fake_extractor_grounds_every_mention() -> None:

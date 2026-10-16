@@ -1,22 +1,21 @@
 """Deterministic fakes for the LLM ports, so pipeline/integration tests run offline and free.
 
 ``FakeExtractor`` grounds every mention in a real span of the material (it locates each configured
-keyword in the text), guaranteeing the fakes never produce an unfaithful reference. ``FakeRanker``
-orders concepts by their computed signals with a templated rationale.
+keyword in the text), guaranteeing the fakes never produce an unfaithful reference.
+``FakeExplainer`` returns a templated rationale per requested concept — it never ranks (ordering is
+the service's job).
 """
 
 from __future__ import annotations
 
 from collections.abc import Sequence
 
-from distil.domain.concept import Concept
 from distil.domain.material import Material
-from distil.domain.relationship import Relationship
 from distil.domain.source_reference import SourceReference
 from distil.ports.llm import (
     ConceptMention,
+    ExplanationRequest,
     ExtractionResult,
-    RankedConcept,
     RelationshipMention,
 )
 
@@ -59,39 +58,18 @@ class FakeExtractor:
         return ExtractionResult(concepts=tuple(mentions), relationships=relationships)
 
 
-class FakeRanker:
-    """Ranks concepts by (pagerank, recurrence, label) with a templated rationale.
+class FakeExplainer:
+    """Returns a deterministic, signal-referencing rationale per request (no ranking).
 
-    Satisfies :class:`~distil.ports.llm.Ranker`.
+    Satisfies :class:`~distil.ports.llm.Explainer`.
     """
 
-    def rank(
-        self,
-        concepts: Sequence[Concept],
-        relationships: Sequence[Relationship],  # noqa: ARG002 - signals already on concepts
-    ) -> list[RankedConcept]:
-        ordered = sorted(
-            concepts,
-            key=lambda c: (
-                -(c.centrality or {}).get("pagerank", 0.0),
-                -c.recurrence_count,
-                c.label,
-            ),
-        )
-        ranked: list[RankedConcept] = []
-        for i, c in enumerate(ordered):
-            signals = dict(c.centrality or {})
-            signals["recurrence"] = float(c.recurrence_count)
-            ranked.append(
-                RankedConcept(
-                    concept_id=c.id,
-                    rank=i + 1,
-                    signals=signals,
-                    rationale=(
-                        f"{c.label!r} ranks #{i + 1}: it recurs across {c.recurrence_count} "
-                        f"material(s) and is connected in the concept graph."
-                    ),
-                    evidence=c.sources[:1],
-                )
+    def explain(self, requests: Sequence[ExplanationRequest]) -> dict[str, str]:
+        rationales: dict[str, str] = {}
+        for req in requests:
+            links = ", ".join(req.neighbor_labels) if req.neighbor_labels else "no other concept"
+            rationales[req.concept_id] = (
+                f"{req.label!r} ranks #{req.rank}: it recurs across "
+                f"{int(req.signals.get('recurrence', 0))} material(s) and links to {links}."
             )
-        return ranked
+        return rationales

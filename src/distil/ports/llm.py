@@ -1,8 +1,13 @@
-"""Ports: the LLM provider surface — concept/relationship extraction and ranking.
+"""Ports: the LLM provider surface — concept/relationship extraction and rationale writing.
 
 Behind these ports sits the Gemini adapter for the MVP; swapping to a more capable model later is a
-contained change. The DTOs here are the *raw* LLM output (mentions, ranked concepts): they carry
-provenance but not yet domain ids/recurrence — the services assign those during merge and build.
+contained change. Two deliberately narrow jobs:
+
+* :class:`ConceptExtractor` turns a material's text into grounded mentions (each with a provenance
+  span the services verify before trusting it).
+* :class:`Explainer` writes the plain-language "why" for concepts the ranking service has *already*
+  selected and ordered. It never decides rank or signals — those are deterministic code — so the
+  model cannot silently reorder the vital-few (Principle II: explainable, not black-box).
 """
 
 from __future__ import annotations
@@ -11,9 +16,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Protocol
 
-from distil.domain.concept import Concept
 from distil.domain.material import Material
-from distil.domain.relationship import Relationship
 from distil.domain.source_reference import SourceReference
 
 
@@ -52,23 +55,30 @@ class ConceptExtractor(Protocol):
 
 
 @dataclass(frozen=True, slots=True)
-class RankedConcept:
-    """One concept's placement in the 80/20 ranking, pre-persistence (no id/run yet)."""
+class ExplanationRequest:
+    """One already-ranked concept the explainer should write a rationale for.
+
+    The service fills this in; the explainer may *use* these facts but may not change them. It
+    carries the computed ``rank`` and ``signals``, the labels of directly connected concepts, and
+    verbatim source quotes the rationale is allowed to reference — nothing it could use to invent a
+    different ordering.
+    """
 
     concept_id: str
+    label: str
     rank: int
     signals: dict[str, float]
-    rationale: str
-    evidence: tuple[SourceReference, ...]
+    neighbor_labels: tuple[str, ...]
+    evidence_quotes: tuple[str, ...]
 
 
-class Ranker(Protocol):
-    """Ranks concepts into the explainable vital-few, using the graph signals as evidence."""
+class Explainer(Protocol):
+    """Writes the human-readable rationale for each ranked concept — prose only, no ranking."""
 
-    def rank(
-        self,
-        concepts: Sequence[Concept],
-        relationships: Sequence[Relationship],
-    ) -> list[RankedConcept]:
-        """Return concepts ordered most-vital-first, each with a rationale and source evidence."""
+    def explain(self, requests: Sequence[ExplanationRequest]) -> dict[str, str]:
+        """Return ``concept_id -> one rationale sentence``, produced in a single batched call.
+
+        A concept omitted from the returned mapping gets a deterministic fallback rationale from the
+        service, so the vital-few view is always fully explained even if the model drops one.
+        """
         ...

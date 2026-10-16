@@ -1,7 +1,13 @@
-"""Unit tests for the ranking service: the vital-few cap and faithful-evidence fallback (T028)."""
+"""Unit tests for the ranking service (T028 service seam).
+
+Covers the vital-few cap (SC-004), the deterministic composite ordering with degree folded in,
+the LLM-rationale-with-fallback behaviour, and that evidence is always the concept's own grounded
+sources (the explainer never supplies evidence or ordering).
+"""
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import UTC, datetime
 
 import pytest
@@ -9,12 +15,14 @@ import pytest
 from distil.domain.concept import Concept
 from distil.domain.material import Material, MaterialFormat, MaterialStatus
 from distil.domain.source_reference import SourceReference
-from distil.ports.llm import RankedConcept
+from distil.ports.llm import ExplanationRequest
 from distil.services.ranking import (
     VITAL_FEW_MAX_FRACTION,
     RankingService,
+    composite_scores,
     vital_few_size,
 )
+from tests._fakes.llm import FakeExplainer
 
 _CONTENT = "alpha beta gamma delta epsilon zeta eta theta"
 
@@ -32,66 +40,94 @@ def _material() -> Material:
     )
 
 
-def _concept(cid: str, label: str, start: int, end: int) -> Concept:
+def _concept(
+    cid: str, label: str, start: int, end: int, *, pagerank: float, degree: float, recurrence: int
+) -> Concept:
     ref = SourceReference(
         material_id="m1", start_offset=start, end_offset=end, quote=_CONTENT[start:end]
     )
-    return Concept(id=cid, workspace_id="w1", label=label, sources=(ref,), recurrence_count=1)
+    return Concept(
+        id=cid,
+        workspace_id="w1",
+        label=label,
+        sources=(ref,),
+        recurrence_count=recurrence,
+        centrality={"pagerank": pagerank, "degree": degree},
+    )
 
 
 @pytest.mark.parametrize(
     ("total", "expected"),
-    [
-        (0, 0),
-        (4, 0),  # below the minimum → no vital few
-        (5, 1),  # ceil(1.0)=1, cap floor(1.25)=1
-        (6, 1),  # ceil(1.2)=2 but capped at floor(1.5)=1  (never exceeds 25%)
-        (10, 2),  # 20%
-        (20, 4),  # 20%, under the 25% cap of 5
-        (100, 20),
-    ],
+    [(0, 0), (4, 0), (5, 1), (6, 1), (10, 2), (20, 4), (100, 20)],
 )
 def test_vital_few_size_targets_20pct_never_above_25pct(total: int, expected: int) -> None:
     size = vital_few_size(total)
     assert size == expected
-    # SC-004 hard cap: the vital few never exceeds 25% of the corpus.
-    assert size <= total * VITAL_FEW_MAX_FRACTION
+    assert size <= total * VITAL_FEW_MAX_FRACTION  # SC-004 hard cap
+
+
+def test_composite_score_folds_in_degree() -> None:
+    # Two concepts tied on PageRank and recurrence; only degree differs → the higher degree wins.
+    low = _concept("c_low", "low", 0, 5, pagerank=0.1, degree=1.0, recurrence=1)
+    high = _concept("c_high", "high", 6, 10, pagerank=0.1, degree=9.0, recurrence=1)
+    scores = composite_scores([low, high])
+    assert scores["c_high"] > scores["c_low"]
+
+
+def _five_concepts() -> list[Concept]:
+    # Distinct PageRank values so the order is unambiguous.
+    data = [
+        ("c1", "alpha", 0, 5, 0.30, 4.0, 2),
+        ("c2", "beta", 6, 10, 0.25, 3.0, 1),
+        ("c3", "gamma", 11, 16, 0.20, 2.0, 1),
+        ("c4", "delta", 17, 22, 0.15, 1.0, 1),
+        ("c5", "epsilon", 23, 30, 0.10, 1.0, 1),
+    ]
+    return [
+        _concept(cid, label, s, e, pagerank=pr, degree=deg, recurrence=rec)
+        for cid, label, s, e, pr, deg, rec in data
+    ]
+
+
+def test_rank_is_deterministic_and_independent_of_explainer_order() -> None:
+    concepts = _five_concepts()
+
+    class _ReversingExplainer:
+        """Returns rationales keyed by id; the service must ignore any order it implies."""
+
+        def explain(self, requests: Sequence[ExplanationRequest]) -> dict[str, str]:
+            return {r.concept_id: f"because {r.label}" for r in reversed(list(requests))}
+
+    run, entries = RankingService(_ReversingExplainer()).rank("w1", concepts, [], [_material()])
+    # 5 concepts → vital few of 1, and it is the top composite scorer (highest PageRank+degree).
+    assert run.vital_few_size == 1
+    assert [e.concept_id for e in entries] == ["c1"]
+    assert entries[0].rank == 1
+    assert entries[0].signals["degree"] == 4.0  # the full breakdown is stored
+
+
+def test_missing_rationale_falls_back_to_deterministic_sentence() -> None:
+    concepts = _five_concepts()
+
+    class _SilentExplainer:
+        def explain(self, requests: Sequence[ExplanationRequest]) -> dict[str, str]:
+            return {}  # the model returned nothing usable
+
+    _, entries = RankingService(_SilentExplainer()).rank("w1", concepts, [], [_material()])
+    assert entries[0].rationale.strip()  # never empty (VitalFewEntry invariant + graceful degrade)
+    assert "Ranked #1" in entries[0].rationale
+
+
+def test_evidence_is_the_concepts_grounded_sources() -> None:
+    concepts = _five_concepts()
+    _, entries = RankingService(FakeExplainer()).rank("w1", concepts, [], [_material()])
+    entry = entries[0]
+    assert len(entry.evidence) == 1
+    assert entry.evidence[0].is_faithful_to(_CONTENT)
 
 
 def test_too_small_corpus_yields_empty_run() -> None:
-    concepts = [_concept("c1", "alpha", 0, 5), _concept("c2", "beta", 6, 10)]
-
-    class _AllRanker:
-        def rank(self, concepts, relationships):  # type: ignore[no-untyped-def]
-            return [
-                RankedConcept(c.id, i + 1, {"pagerank": 0.1}, "because", c.sources)
-                for i, c in enumerate(concepts)
-            ]
-
-    run, entries = RankingService(_AllRanker()).rank("w1", concepts, [], [_material()])
+    concepts = _five_concepts()[:2]  # below the minimum
+    run, entries = RankingService(FakeExplainer()).rank("w1", concepts, [], [_material()])
     assert entries == []
     assert run.vital_few_size == 0
-
-
-def test_unfaithful_evidence_falls_back_to_concept_sources() -> None:
-    # 5 concepts so a vital few forms; the ranker cites a bogus span for the top concept.
-    concepts = [
-        _concept("c1", "alpha", 0, 5),
-        _concept("c2", "beta", 6, 10),
-        _concept("c3", "gamma", 11, 16),
-        _concept("c4", "delta", 17, 22),
-        _concept("c5", "epsilon", 23, 30),
-    ]
-    bogus = SourceReference(material_id="m1", start_offset=0, end_offset=5, quote="WRONG")
-
-    class _LyingRanker:
-        def rank(self, concepts, relationships):  # type: ignore[no-untyped-def]
-            return [RankedConcept("c1", 1, {"pagerank": 0.9}, "top", (bogus,))]
-
-    run, entries = RankingService(_LyingRanker()).rank("w1", concepts, [], [_material()])
-    assert run.vital_few_size == 1
-    entry = entries[0]
-    # The bogus citation was dropped; the concept's own grounded source stands in.
-    assert len(entry.evidence) == 1
-    assert entry.evidence[0].quote == "alpha"
-    assert entry.evidence[0].is_faithful_to(_CONTENT)

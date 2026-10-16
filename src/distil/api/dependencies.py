@@ -22,7 +22,7 @@ from distil.adapters.persistence.sqlite.repositories import (
 )
 from distil.adapters.persistence.sqlite.schema import connect, initialize
 from distil.config import Settings, get_settings
-from distil.ports.llm import ConceptExtractor, Ranker
+from distil.ports.llm import ConceptExtractor, Explainer
 from distil.ports.repositories import GraphRepository, MaterialRepository
 from distil.services.graph_builder import GraphBuilder
 from distil.services.ingestion import IngestionService
@@ -42,7 +42,7 @@ class Services:
 def build_services(
     conn: sqlite3.Connection,
     extractor: ConceptExtractor,
-    ranker: Ranker,
+    explainer: Explainer,
 ) -> Services:
     """Assemble the services over an open SQLite connection and the given LLM adapters."""
     materials = SqliteMaterialRepository(conn)
@@ -51,21 +51,21 @@ def build_services(
     parsers = (TextParser(), PdfParser())
     ingestion = IngestionService(materials, parsers)
     builder = GraphBuilder(extractor, NetworkxGraphAnalyzer())
-    ranking = RankingService(ranker)
+    ranking = RankingService(explainer)
     pipeline = Pipeline(workspaces, materials, graph, ingestion, builder, ranking)
     return Services(materials=materials, graph=graph, pipeline=pipeline)
 
 
-def build_llm_provider(settings: Settings) -> tuple[ConceptExtractor, Ranker]:
+def build_llm_provider(settings: Settings) -> tuple[ConceptExtractor, Explainer]:
     """Construct the real LLM adapters (Gemini).
 
-    Not implemented yet: the Gemini extractor and ranker (tasks T025/T028) are the next chunk, built
+    Not implemented yet: the Gemini extractor (T025) and explainer (T028) are the next chunk, built
     after their prompts are reviewed (Principle IV — understand before adopt). Until then the
     production app cannot serve the LLM-backed routes; the test suite injects deterministic fakes
     through ``app.dependency_overrides`` and never reaches this path.
     """
     raise NotImplementedError(
-        "The Gemini LLM adapter is not implemented yet. Build the extractor/ranker in "
+        "The Gemini LLM adapter is not implemented yet. Build the extractor/explainer in "
         "distil.adapters.llm.gemini (tasks T025/T028) before serving the API against a real model."
     )
 

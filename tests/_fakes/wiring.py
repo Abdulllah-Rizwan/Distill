@@ -13,14 +13,14 @@ from fastapi.testclient import TestClient
 from distil.adapters.persistence.sqlite.schema import connect, initialize
 from distil.api.dependencies import build_services, get_services
 from distil.api.main import create_app
-from tests._fakes.llm import FakeExtractor, FakeRanker
+from tests._fakes.llm import FakeExplainer, FakeExtractor
 
 
 def make_client(keywords: Sequence[str]) -> TestClient:
     """A TestClient whose extractor finds ``keywords`` in uploaded text; one shared in-memory DB."""
     conn = connect(":memory:")
     initialize(conn)
-    services = build_services(conn, FakeExtractor(keywords), FakeRanker())
+    services = build_services(conn, FakeExtractor(keywords), FakeExplainer())
 
     app = create_app()
     app.dependency_overrides[get_services] = lambda: services
