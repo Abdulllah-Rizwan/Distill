@@ -17,36 +17,43 @@ in `decisions.md`; this file tracks *activity and todos* only.
   Recorded in the constitution's own version history (not as a decisions.md ADR).
 - Reframed `decisions.md`: new purpose statement (shifts + governance only), kept the three founding
   entries (ADR-0001–0003), removed the planning entries I had wrongly logged there.
+- **`git init` + two commits**: initial scaffold/constitution/logs, then the spec. Branch renamed
+  `master` → `main`. Added `.gitignore` (secrets, Python, SQLite) and `.gitattributes` (LF for `.sh`).
+- **Ran `/speckit-specify`** → `specs/001-concept-graph-8020/spec.md` (3 user stories, 16 FRs, 8 SCs,
+  edge cases, assumptions). Quality checklist all-pass. Committed.
+- **Ran `/speckit-plan`** → generated `plan.md`, `research.md`, `data-model.md`,
+  `contracts/http-api.md`, `quickstart.md`. Post-design Constitution Check PASS.
 
-### Planning direction agreed in discussion (to be formalized in `spec.md` / `plan.md`, NOT yet recorded as ADRs)
-- **Backend language = Python**; frontend TS deferred until the backend is proven. → `plan.md`
-- **v1 ingestion formats = text, Markdown, text-based PDF**; DOCX/PPTX/OCR deferred. → `spec.md`/`plan.md`
-- **Storage = SQLite + NetworkX behind a thin persistence port for v1**, with **Postgres + Neo4j on
-  cloud as the documented target** and **migration trigger = going cloud / multi-user**. Accepted the
-  trade-off that NetworkX won't mirror Neo4j's Cypher semantics (some queries rethought at migration). → `plan.md`
-- **80/20 ranking = batch step on ingest**, re-run when new material is added. → `plan.md`
-- **Eval datasets live in `evals/` at the repo root**, versioned in-git (Principle VII). → `plan.md`
+### Planning decisions formalized (now in `plan.md` / `research.md`)
+- **Python 3.12**, packaging via **uv**. Backend-first; TS frontend deferred.
+- **Interface = FastAPI HTTP API over a framework-agnostic core** (hexagonal ports/adapters).
+- **Storage = SQLite (source of truth) + NetworkX (compute) behind a persistence port**; target
+  Postgres + Neo4j on cloud; migration trigger = cloud/multi-user.
+- **80/20 = batch ranking on ingest** (graph signals: centrality + recurrence) + LLM explainer.
+- **PDF = PyMuPDF; tests = pytest; evals = small in-repo harness** (faithfulness deterministic +
+  relevance LLM-judge) in `evals/`.
+- **LLM = Google Gemini 3 Flash, free tier** (`GEMINI_MODEL=gemini-3-flash`), behind an LLM provider
+  port — **changed from the Claude options I had offered**; user chose free-tier to avoid cost and
+  plans to swap to a more capable model later (that swap will be a `decisions.md` decision-shift).
+- ⚠️ **Principle V caveat recorded**: Gemini free-tier content may be used by Google to improve
+  products → MVP only with the author's own non-sensitive test notes; not for real student data until
+  on a paid/no-training tier.
 
 ### State of the repo
-- Still **not a git repository** and **no application code** yet. Constitution now at **v1.1.0**
-  (8 principles). `decisions.md` holds the three founding entries (ADR-0001–0003) and no shifts yet.
+- **Git repo on `main`**, 2 commits. Constitution **v1.1.0** (8 principles). First feature fully
+  specced + planned (`specs/001-concept-graph-8020/`). **No application code yet.**
 
 ### Pick up here next
-1. **`git init`** — worth it now, so the constitution, decisions, specs, and code are all versioned
-   from the first commit.
-2. **Run `/speckit-specify`** for the v1 slice: ingest (text/md/text-PDF) → concept knowledge graph
-   → explainable 80/20 view. The scope and format decisions above land here.
-3. **Run `/speckit-plan`** — this is where the Python / storage / persistence-port / batch-ranking /
-   evals decisions get formally recorded with their rationale.
-4. Open technical questions to settle during plan: Python tooling/layout, LLM provider+model (prompt
-   in source), eval tooling, PDF extraction library.
+1. **Run `/speckit-tasks`** to generate the dependency-ordered task list for implementation.
+2. Then `/speckit-implement` (or build incrementally), starting with the core domain + ports and the
+   fake-LLM test path so faithfulness is testable from day one.
+3. Confirm the exact `gemini-3-flash` API string + live free-tier limits in AI Studio before the
+   first real LLM call.
 
 ### Open questions to resolve
-- Python dependency/tooling: uv vs. poetry vs. pip-tools?
-- Which LLM provider + model for concept extraction and the 80/20 ranker? (needs an ADR + prompt in
-  source control)
-- Eval tooling: ragas vs. deepeval vs. a small custom harness?
-- PDF text extraction: pymupdf vs. pdfplumber?
+- Confirm the `gemini-3-flash` API model string + live free-tier rate limits (AI Studio).
+- Centrality measure + signal weighting for the 80/20 (start degree + PageRank; tune via evals).
+- Chunk size / overlap for extraction (set from model context window + free-tier TPM).
 
 ---
 
