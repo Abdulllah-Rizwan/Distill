@@ -31,30 +31,69 @@ in `decisions.md`; this file tracks *activity and todos* only.
   1.0, graph too sparse) → the "vital few" is effectively arbitrary on one doc.
 - **Multi-document (3 Cloud lectures, 75pp):** the **graph/centrality half works** — ranking now
   discriminates (`IaaS` #1 at degree 6, then `web-based portal`, `PaaS`, `Security`). **But the
-  recurrence half is inert:** only **12 concepts total** extracted, every one grounded in **exactly
-  one material** → *zero* cross-material recurrence. Two causes: (a) **extraction too sparse** (the
-  prompt's "prefer fewer" is too conservative for slide decks), and (b) **no cross-material concept
-  merge** (shared topics like IaaS/PaaS didn't merge — surface-form mismatch or not extracted in
-  both). Extraction also favours proper nouns / slide headers (AWS, Netflix, "Stage 1. Design").
+  recurrence half is inert:** **0 of 56 concepts** recur across materials.
+  - *Correction (same-day, after inspecting the DB):* an earlier note here claimed extraction was
+    "too sparse (12 concepts)". That was wrong — 12 was the *vital-few shortlist*; the corpus
+    actually extracted **56 concepts**. Extraction is **verbose and noisy, not sparse.**
+  - Real causes of the inert recurrence: (a) **noise** — the extractor pulls slide headers
+    (`Stage 1. Design`…`Stage 8. Decommission`), proper nouns (AWS, Netflix, Uber, Spotify,
+    Kubernetes), and **within-material near-duplicates that don't merge** (`virtual machine
+    management` vs `Virtual Machine technique` — casefold match is too strict); (b) **premise** —
+    these three lectures cover *disjoint sequential topics*, so even perfect extraction yields little
+    shared vocabulary. Recurrence-as-importance assumes materials **revisit** concepts (e.g. notes +
+    textbook on one topic), which a sequential course violates. Worth revisiting the recurrence
+    weight / the kind of corpus the 80/20 is pitched at.
+  - **Merge logic and the full-corpus rebuild were verified correct** — the issue is extraction
+    quality + label normalisation, not the graph code.
+
+### Done today (cont.) — eval harness + dataset (T044/T045, code complete)
+- **Built the eval harness** in `evals/harness/` (`python -m evals.harness`), modular per Principle
+  VIII: `dataset.py` (load synthetic notes + ground truth), `recording.py` (record/replay at the
+  `JsonLLM` port), `pipeline_run.py` (run the real ingest→graph→rank over an in-memory DB behind any
+  LLM), `faithfulness.py` (deterministic — every emitted span must equal its source text; 100% or
+  fail), `relevance.py` (LLM-judge score + deterministic precision/recall vs curated
+  `important_concepts`; judge prompt in source), `report.py` (gate: faithfulness==100% AND
+  relevance≥`min_relevance`; drives exit code for T051), `runner.py`, `__main__.py` (`--live`,
+  `--dataset`).
+- **Design choice (user-approved):** both scorers now; **recorded fixtures + `--live`** — replay runs
+  are deterministic, offline, and cost **zero** quota; `--live` re-records only when a prompt/model
+  actually changes (Principle VII). This seam records/replays at `JsonLLM.generate_json`, so the real
+  extractor/explainer/judge code runs against fixed model output.
+- **Dataset `evals/datasets/energy-cycle/`:** 3 short synthetic biology notes engineered so core
+  concepts (glucose, photosynthesis, cellular respiration, ATP, energy) **recur** across materials —
+  giving the 80/20 a known right answer and exercising the recurrence signal the lectures couldn't.
+- **7 new deterministic tests** (`tests/unit/test_evals_harness.py`) via a schema-routing fake LLM:
+  prove the full chain — real pipeline + faithfulness + relevance + replay + gating — offline.
+  **71 tests green**; ruff + format + mypy --strict clean across `src`, `tests`, **and `evals`**
+  (added `evals` to ruff `src`).
+- ⚠️ **`fixtures.json` NOT yet recorded** — see the quota finding below. The harness is complete and
+  tested; a single `--live` run records the real baseline once quota resets.
+
+### ⚠️ Free-tier quota confirmed the hard way (answers an open question)
+- Hit `429 RESOURCE_EXHAUSTED`: **free tier = 20 `generate_content` requests PER DAY** per model
+  (`GenerateRequestsPerDayPerProjectPerModel-FreeTier`, limit 20). Today's smoke + debug + the
+  3-lecture run (~10 calls) exhausted it; retry window ~16h. **Lesson:** be frugal with `--live`;
+  this is exactly why recorded fixtures (replay = 0 quota) is the right default. A real lecture PDF is
+  ~4 calls, so ≤5 PDFs/day on free tier.
 
 ### Pick up here next time
-1. **Update the local `.env`**: set `GEMINI_MODEL=gemini-3-flash-preview` (the running app needs it;
-   Claude couldn't edit `.env` — credential guard). Also confirm free-tier limits for the `-preview`
-   id in AI Studio.
-2. **Raise extraction recall + fix cross-material merge** — the core blocker for a real 80/20:
-   - Tune the extraction prompt to pull more grounded concepts per slide (without hurting faithfulness).
-   - Verify/normalise concept merging across materials so shared topics actually recur (recurrence
-     signal is dead until this works).
-   - Consider whether slide-header/proper-noun noise needs a filter or prompt guidance.
-3. **Build the eval harness (T044/T045)** so the above is measured, not guessed — faithfulness 100%
-   deterministic + relevance LLM-judge; this is the right tool for the tuning in (2).
-4. Then **US2 (T034–T038)** graph endpoints and **US3 (T039–T043)**.
+1. **Record the eval baseline:** once quota resets, run `uv run python -m evals.harness --live
+   --dataset energy-cycle` to write `fixtures.json`, then `uv run python -m evals.harness` (replay)
+   and read the first real faithfulness + relevance numbers. Commit the fixtures (versioned asset).
+2. **Raise extraction recall quality + fix cross-material merge** — the core 80/20 blocker, now
+   measurable against the harness:
+   - Tune the extraction prompt (noise: slide headers / proper nouns; near-duplicate labels).
+   - Decide concept identity: exact-label vs. normalised/fuzzy merge (→ a `decisions.md` entry).
+   - Re-run `--live` after any prompt change (Principle VII) — budget the 20/day.
+3. Then **US2 (T034–T038)** graph endpoints and **US3 (T039–T043)**.
 
 ### Open questions
-- Free-tier RPM/TPM for `gemini-3-flash-preview` (the 3-lecture run hit backoff/throttling — it ran
-  long). Confirm limits; may need to pace ingestion or raise `DEFAULT_MAX_CHARS` to cut call count.
+- ~~Free-tier request limits~~ → **confirmed: 20 generate_content/day/model.** Still open: TPM/RPM
+  within a day, and whether to raise `DEFAULT_MAX_CHARS` to cut calls-per-PDF.
 - Cross-material concept identity: exact-label match vs. normalised/fuzzy merge (decision pending —
-  likely a `decisions.md` entry once chosen).
+  a `decisions.md` entry once chosen).
+- Recurrence premise: is the 80/20 pitched at revisited-topic corpora vs. sequential course lectures?
+  May warrant reweighting recurrence vs. centrality (eval-tunable now).
 
 ---
 

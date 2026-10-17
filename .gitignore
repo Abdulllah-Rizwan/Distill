@@ -39,7 +39,9 @@ htmlcov/
 data/
 
 # === Local test material (Principle V — do not commit third-party/course content) ===
-Notes/
+# Anchored to repo root so it does not also match eval dataset dirs like evals/.../notes/
+# (git is case-insensitive on Windows, so an unanchored "Notes/" would catch "notes/" too).
+/Notes/
 
 # === Editors / OS ===
 .vscode/

@@ -1,0 +1,12 @@
+{
+  "name": "energy-cycle",
+  "description": "Three short, interlinked biology notes where the core concepts (glucose, photosynthesis, cellular respiration, ATP, energy) recur across materials, so a correct 80/20 should surface them above the peripheral ones (chlorophyll, mitochondria, oxygen, sunlight).",
+  "important_concepts": [
+    "glucose",
+    "photosynthesis",
+    "cellular respiration",
+    "ATP",
+    "energy"
+  ],
+  "min_relevance": 0.6
+}
