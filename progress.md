@@ -5,6 +5,59 @@ in `decisions.md`; this file tracks *activity and todos* only.
 
 ---
 
+## 2026-10-17
+
+### Done today — first real Gemini calls (milestone #1)
+- **Made the first live Gemini calls ever.** Staged smoke per yesterday's plan: a tiny synthetic
+  non-sensitive snippet through the extractor first, then real lecture PDFs through the full HTTP
+  stack (`POST /materials` → `GET /vital-few`) via FastAPI `TestClient` against the production
+  composition root (real Gemini provider), into an **isolated scratchpad DB** (no project pollution,
+  Principle V preserved for the repo).
+- **Found and fixed a real bug + a dead model id — logged as `DS-0001` (decisions.md):**
+  - Planned `gemini-3-flash` **does not exist** on the API (404). Corrected to `gemini-3-flash-preview`
+    (confirmed against the live model list for this key).
+  - `gemini-3-flash-preview` is a *thinking* model → reasoning tokens drained `max_output_tokens`,
+    truncating the JSON (`MAX_TOKENS`) so **0 concepts** came back. Fix: `GeminiClient(thinking_budget=0)`
+    (default). Cheaper on free-tier TPM; our tasks are mechanical and need no reasoning.
+  - Files: `src/distil/config.py`, `.env.example` (model id), `src/distil/adapters/llm/gemini/_client.py`
+    (thinking_budget param + rationale comment). Everything still green: ruff + format + mypy --strict
+    + **64 tests**.
+- **Faithfulness verified live (Principle I holds):** every returned concept/relationship span is
+  verbatim (`quote == content_text[start:end]`) with page provenance; evidence arrays non-empty.
+- Added `Notes/` to `.gitignore` (local course material — must never be committed, Principle V).
+
+### Honest quality findings from the live runs (feed the eval/tuning phase)
+- **Single-document ranking is degenerate:** all signals tie at `score=1.0` (recurrence is uniformly
+  1.0, graph too sparse) → the "vital few" is effectively arbitrary on one doc.
+- **Multi-document (3 Cloud lectures, 75pp):** the **graph/centrality half works** — ranking now
+  discriminates (`IaaS` #1 at degree 6, then `web-based portal`, `PaaS`, `Security`). **But the
+  recurrence half is inert:** only **12 concepts total** extracted, every one grounded in **exactly
+  one material** → *zero* cross-material recurrence. Two causes: (a) **extraction too sparse** (the
+  prompt's "prefer fewer" is too conservative for slide decks), and (b) **no cross-material concept
+  merge** (shared topics like IaaS/PaaS didn't merge — surface-form mismatch or not extracted in
+  both). Extraction also favours proper nouns / slide headers (AWS, Netflix, "Stage 1. Design").
+
+### Pick up here next time
+1. **Update the local `.env`**: set `GEMINI_MODEL=gemini-3-flash-preview` (the running app needs it;
+   Claude couldn't edit `.env` — credential guard). Also confirm free-tier limits for the `-preview`
+   id in AI Studio.
+2. **Raise extraction recall + fix cross-material merge** — the core blocker for a real 80/20:
+   - Tune the extraction prompt to pull more grounded concepts per slide (without hurting faithfulness).
+   - Verify/normalise concept merging across materials so shared topics actually recur (recurrence
+     signal is dead until this works).
+   - Consider whether slide-header/proper-noun noise needs a filter or prompt guidance.
+3. **Build the eval harness (T044/T045)** so the above is measured, not guessed — faithfulness 100%
+   deterministic + relevance LLM-judge; this is the right tool for the tuning in (2).
+4. Then **US2 (T034–T038)** graph endpoints and **US3 (T039–T043)**.
+
+### Open questions
+- Free-tier RPM/TPM for `gemini-3-flash-preview` (the 3-lecture run hit backoff/throttling — it ran
+  long). Confirm limits; may need to pace ingestion or raise `DEFAULT_MAX_CHARS` to cut call count.
+- Cross-material concept identity: exact-label match vs. normalised/fuzzy merge (decision pending —
+  likely a `decisions.md` entry once chosen).
+
+---
+
 ## 2026-10-16
 
 ### Done today

@@ -38,6 +38,9 @@ htmlcov/
 *.sqlite3
 data/
 
+# === Local test material (Principle V — do not commit third-party/course content) ===
+Notes/
+
 # === Editors / OS ===
 .vscode/
 .idea/

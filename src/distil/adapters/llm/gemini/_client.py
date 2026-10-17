@@ -71,6 +71,7 @@ class GeminiClient:
         model: str,
         temperature: float = 0.0,
         max_output_tokens: int = 4096,
+        thinking_budget: int = 0,
         max_retries: int = 4,
         base_delay: float = 2.0,
         sleep: Callable[[float], None] = time.sleep,
@@ -79,6 +80,13 @@ class GeminiClient:
         self._model = model
         self._temperature = temperature
         self._max_output_tokens = max_output_tokens
+        # Gemini 3 "flash" is a thinking model: without this, reasoning tokens are drawn from the
+        # same budget as the answer, so a structured-output call can spend the budget thinking and
+        # return the JSON truncated (FinishReason.MAX_TOKENS → an unparseable response we drop).
+        # Both of our asks — copy verbatim quotes, write one grounded sentence from given facts —
+        # are mechanical, so thinking is disabled by default: it removes the truncation, is cheaper,
+        # and conserves the free-tier tokens-per-minute budget. Raise it only if evals show a need.
+        self._thinking_budget = thinking_budget
         self._max_retries = max_retries
         self._base_delay = base_delay
         self._sleep = sleep
@@ -96,6 +104,7 @@ class GeminiClient:
                     response_schema=response_schema,
                     temperature=self._temperature,
                     max_output_tokens=self._max_output_tokens,
+                    thinking_config=types.ThinkingConfig(thinking_budget=self._thinking_budget),
                 ),
             )
             return response.text or ""

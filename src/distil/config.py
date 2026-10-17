@@ -35,8 +35,9 @@ class Settings(BaseSettings):
         "and non-LLM tests working. The Gemini adapter checks it is set before use.",
     )
     gemini_model: str = Field(
-        default="gemini-3-flash",
-        description="Gemini model id. Confirm the exact free-tier string + limits in AI Studio.",
+        default="gemini-3-flash-preview",
+        description="Gemini model id. The planned 'gemini-3-flash' does not exist on the API; "
+        "'gemini-3-flash-preview' is the Gemini 3 Flash id this key can call (see decisions.md).",
     )
 
     # Local persistence (SQLite source of truth for v1).

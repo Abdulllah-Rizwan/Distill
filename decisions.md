@@ -78,4 +78,28 @@ is not a precedent for logging future planned decisions here.
 
 ## Decision shifts
 
-*(None yet. The first entry lands when implementation causes us to change a plan.)*
+### DS-0001 — Gemini model id `gemini-3-flash` → `gemini-3-flash-preview`, and disable model "thinking" for our calls
+- **Date:** 2026-10-17
+- **Status:** Accepted
+- **What changed:** The pinned Gemini model id, plus a new client setting (`thinking_budget=0`)
+  that turns off the model's internal reasoning for our structured-output calls.
+- **Original plan (`plan.md` / `research.md`):** `GEMINI_MODEL=gemini-3-flash` (Gemini 3 Flash,
+  free tier), behind the LLM provider port.
+- **Context / what we hit (the first real Gemini call):**
+  1. `gemini-3-flash` returned **HTTP 404** (`models/gemini-3-flash is not found for API version
+     v1beta`). Listing the models this key can call shows **no bare `gemini-3-flash`**; the Gemini 3
+     Flash model is served as **`gemini-3-flash-preview`**.
+  2. After switching, the call returned **zero concepts**. `gemini-3-flash-preview` is a *thinking*
+     model: with `max_output_tokens=4096` the reasoning tokens (~3,900) consumed the budget, so the
+     JSON came back truncated (`finish_reason=MAX_TOKENS`) and failed schema validation — the adapter
+     correctly drops an unparseable chunk, so the whole material yielded nothing. Setting
+     `thinking_config.thinking_budget=0` fixed it (clean `STOP`, full valid JSON, 7/7 faithful spans
+     on the synthetic probe) and is far cheaper on the free-tier tokens-per-minute budget.
+- **Decision:** Pin `GEMINI_MODEL=gemini-3-flash-preview`; default `GeminiClient(thinking_budget=0)`.
+  Both of our asks — copy verbatim quotes, write one grounded sentence from supplied facts — are
+  mechanical and do not need model reasoning, so thinking stays off unless an eval later shows the
+  explainer needs it (one knob to raise).
+- **Rationale:** Preserves the plan's intent (Gemini 3 Flash) with the real API id; removes a
+  silent, faithfulness-adjacent failure mode (truncation → silently dropped concepts) and conserves
+  free-tier tokens. **Revisit** when a stable (non-`-preview`) Gemini 3 Flash GA id appears, or if a
+  more capable model is adopted (that swap is itself a future shift).
