@@ -13,9 +13,9 @@ from distil.domain.source_reference import SourceReference
 class RankingRun:
     """One batch computation of graph signals + the 80/20 ranking over a workspace.
 
-    The current vital-few view is the set of :class:`VitalFewEntry` of the latest run. The
-    "vital_few_size <= 25% of total concepts" cap (SC-004) is enforced by the ranking service, which
-    knows the total concept count; this entity only records the resulting size.
+    The current vital-few view is the set of :class:`VitalFewEntry` of the latest run. The vital-few
+    sizing (a small, bounded set — SC-004) is decided by the ranking service, which knows the total
+    concept count; this entity only records the resulting size.
     """
 
     id: str

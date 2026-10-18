@@ -14,7 +14,7 @@
 
 A student has a pile of course notes and little time. They add their notes to Distil and ask,
 "what are the most important ideas here?" Distil returns a short, ranked set of "vital few"
-concepts — the roughly 20% of ideas that carry most of the weight — and, next to each one, a plain
+concepts — a small, fixed-size shortlist of the ideas that carry most of the weight — and, next to each one, a plain
 rationale for *why* it ranked where it did, with links to the exact passages in their own notes that
 support it. The student can trust the list because every claim points back to their material.
 
@@ -138,8 +138,8 @@ a material and confirm its ungrounded concepts no longer appear.
 
 **Explainable 80/20 ranking**
 
-- **FR-009**: System MUST produce a ranked "vital few" set of concepts representing the minority of
-  ideas that carry most of the importance across the materials.
+- **FR-009**: System MUST produce a ranked "vital few" set of concepts — a small, fixed-size
+  shortlist of the ideas that carry most of the importance across the materials (sizing per SC-004).
 - **FR-010**: The ranking MUST be grounded in evidence derived from the graph — specifically how
   central a concept is (how connected it is to others) and how it recurs across the materials.
 - **FR-011**: Each ranked concept MUST display a visible, plain-language rationale ("why") that refers
@@ -183,9 +183,13 @@ a material and confirm its ungrounded concepts no longer appear.
   at least one openable reference to a passage in their own materials. *(Faithfulness — non-negotiable.)*
 - **SC-003**: 0 concepts or relationships that are not grounded in the uploaded materials appear in
   the graph or ranking, measured against a curated evaluation dataset.
-- **SC-004**: The vital-few set is a minority of all extracted concepts (target ≤ 25%) while, in
-  evaluation against a curated dataset, capturing at least 80% of the concepts domain reviewers mark
-  as "most important" (relevance/recall).
+- **SC-004**: The vital-few set is a small, fixed-size shortlist of the top concepts (target ~5,
+  clamped to the corpus — NOT a percentage of it), so it stays a usable "few" whether the corpus
+  yields 9 concepts or 900. In evaluation against a curated dataset it ranks the concepts domain
+  reviewers mark "most important" ahead of the peripheral ones; comprehensive drill-down beyond the
+  few is served by the concept hierarchy (a separate feature). *(Supersedes the original ≤25% Pareto
+  cut, which collapsed to 2 on a tiny corpus and ballooned to 43 on five lectures — see decisions.md
+  DS-0004.)*
 - **SC-005**: For a typical upload (target: up to ~50 pages across materials), the student gets from
   upload to the vital-few view in under 2 minutes.
 - **SC-006**: Given an unsupported or ungroundable input, the system informs the student and produces
@@ -203,8 +207,9 @@ a material and confirm its ungrounded concepts no longer appear.
   DOCX/PPTX parsing are out of scope for v1.
 - **Workspace-wide ranking.** The vital-few view is computed across the student's whole set of
   materials (not per individual file), because "recurrence across materials" is part of the evidence.
-- **Adaptive vital-few size.** "80/20" is treated as a guiding heuristic: the shortlist size adapts to
-  where the importance distribution falls, capped at the SC-004 target rather than a fixed exact 20%.
+- **Bounded vital-few size.** "80/20" is treated as a guiding spirit, not arithmetic: the shortlist is
+  a small, fixed-size set of the top concepts (SC-004), clamped to the corpus — not a percentage of
+  it — so it stays a usable "few" at any scale. Depth beyond the few is the concept hierarchy's job.
 - **Input is provided as one or more uploaded files.** No integration with external note apps or
   cloud drives in v1.
 - **The quantitative targets in SC-004 and SC-005 are initial goals to validate and tune via the

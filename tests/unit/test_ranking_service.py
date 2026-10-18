@@ -1,8 +1,8 @@
 """Unit tests for the ranking service (T028 service seam).
 
-Covers the vital-few cap (SC-004), the deterministic composite ordering with degree folded in,
-the LLM-rationale-with-fallback behaviour, and that evidence is always the concept's own grounded
-sources (the explainer never supplies evidence or ordering).
+Covers the vital-few sizing (a small bounded set, SC-004), the deterministic composite ordering with
+degree folded in, the LLM-rationale-with-fallback behaviour, and that evidence is always the
+concept's own grounded sources (the explainer never supplies evidence or ordering).
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ from distil.domain.material import Material, MaterialFormat, MaterialStatus
 from distil.domain.source_reference import SourceReference
 from distil.ports.llm import ExplanationRequest
 from distil.services.ranking import (
-    VITAL_FEW_MAX_FRACTION,
+    VITAL_FEW_TARGET_SIZE,
     RankingService,
     composite_scores,
     vital_few_size,
@@ -58,12 +58,14 @@ def _concept(
 
 @pytest.mark.parametrize(
     ("total", "expected"),
-    [(0, 0), (4, 0), (5, 1), (6, 1), (10, 2), (20, 4), (100, 20)],
+    [(0, 0), (4, 0), (5, 5), (6, 5), (10, 5), (20, 5), (100, 5), (211, 5)],
 )
-def test_vital_few_size_targets_20pct_never_above_25pct(total: int, expected: int) -> None:
+def test_vital_few_size_is_bounded_small_set(total: int, expected: int) -> None:
     size = vital_few_size(total)
     assert size == expected
-    assert size <= total * VITAL_FEW_MAX_FRACTION  # SC-004 hard cap
+    # A fixed small target, clamped to the corpus — never grows with corpus size (SC-004).
+    assert size <= VITAL_FEW_TARGET_SIZE
+    assert size <= total
 
 
 def test_composite_score_folds_in_degree() -> None:
@@ -99,10 +101,11 @@ def test_rank_is_deterministic_and_independent_of_explainer_order() -> None:
             return {r.concept_id: f"because {r.label}" for r in reversed(list(requests))}
 
     run, entries = RankingService(_ReversingExplainer()).rank("w1", concepts, [], [_material()])
-    # 5 concepts → vital few of 1, and it is the top composite scorer (highest PageRank+degree).
-    assert run.vital_few_size == 1
-    assert [e.concept_id for e in entries] == ["c1"]
-    assert entries[0].rank == 1
+    # 5 concepts → all 5 are the vital few (target is 5), ordered by composite score regardless of
+    # the order the explainer returned rationales in.
+    assert run.vital_few_size == 5
+    assert [e.concept_id for e in entries] == ["c1", "c2", "c3", "c4", "c5"]
+    assert [e.rank for e in entries] == [1, 2, 3, 4, 5]
     assert entries[0].signals["degree"] == 4.0  # the full breakdown is stored
 
 

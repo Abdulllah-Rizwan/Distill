@@ -62,17 +62,34 @@ in `decisions.md`; this file tracks *activity and todos* only.
   + format + mypy clean. `fixtures.json` is a versioned asset (DS-0002: **provider-specific** — the
   current baseline is DeepSeek; re-record if the provider changes).
 
+### Done today (cont.) — pushed to GitHub; diagnosed the real 80/20 blocker; fixed vital-few sizing (DS-0004)
+- **GitHub:** added remote `origin` (https://github.com/Abdulllah-Rizwan/Distill.git), pushed `main`.
+  Workflow going forward: **push after every feature done + tested** (saved to memory). `.env`/`Notes/`
+  confirmed untracked before pushing.
+- **Diagnosed the recall gap (it was NOT extraction).** Dumped the full ranking from replay: the
+  top-4 by score ARE the 4 important extracted concepts (Glucose, Cellular Respiration, Photosynthesis,
+  ATP) — ranking is sound. Recall was low because **the vital-few cut was 2** (20% of 9).
+- **Local eyeball run on the 5 lecture PDFs** (real DeepSeek, isolated gitignored scratch DB, nothing
+  committed — Principle V): 5 lectures → **211 concepts, vital-few of 43**. Confirmed the flat % cut
+  breaks at both ends (2 when tiny, 43 when large). Also: extraction is verbose/noisy (proper-noun &
+  slide-fragment clutter), and only 12/211 concepts recur across lectures (disjoint topics — but the
+  12 that do recur are the real core: IaaS/SaaS/PaaS/cloud computing/…).
+- **Fixed vital-few sizing (DS-0004):** `vital_few_size` is now a **fixed small target (5), clamped to
+  the corpus**, not a percentage. Updated SC-004 + spec wording + domain docstring + tests. Re-recorded
+  the energy-cycle baseline: **faithfulness 100% (35/35), relevance 1.00** (precision/recall 0.80, up
+  from 0.60/0.40); replay reproduces it. 82 tests green; ruff + format + mypy clean.
+- **Remaining known gap:** "energy" is never extracted as a standalone concept (expressed as "chemical
+  energy"/"energy cycle") — an extraction-granularity question, parked.
+
 ### Pick up here next time
-1. **Tick T044/T045** in tasks.md (eval harness + dataset: now recorded & reproducible) and **commit**
-   today's work if not already (DeepSeek provider DS-0002, determinism fixes DS-0003, fixtures).
-2. **Raise extraction recall** — the measurable 80/20 blocker: the baseline misses recurring concepts
-   (Photosynthesis, ATP). Tune the extraction prompt; re-run `--live` (budget DeepSeek credit) and
-   watch recall/relevance move while faithfulness stays 100%. Decide cross-material concept identity
-   (exact vs. normalised/fuzzy) → a decisions.md entry.
-3. **US2 (T034–T038)** graph endpoints, then **US3 (T039–T043)** — the durable per-material-mentions
+1. **Spec the concept hierarchy** (the agreed next feature): a few root "pillars" (most central /
+   recurring) with other concepts branching underneath via graph connectivity — this is how broad
+   coverage/depth is delivered beyond the flat top-5. Pairs with US2 (graph view). Needs spec + ADR +
+   its own evals. *(In progress — specced right after DS-0004.)*
+2. **US2 (T034–T038)** graph endpoints, then **US3 (T039–T043)**; durable per-material-mentions
    persistence (DS-0003 deferred) belongs with US3's delete/rebuild.
-4. ⚠️ **Not yet committed** — working tree holds the DeepSeek provider, determinism fixes, docs, and
-   `fixtures.json`. Commit when ready.
+3. Optional smaller levers: extraction-noise reduction (proper nouns / slide fragments) and
+   recurrence-vs-degree reweighting — now measurable against the harness.
 
 ---
 

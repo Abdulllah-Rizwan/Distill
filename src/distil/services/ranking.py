@@ -8,15 +8,14 @@ Two separated responsibilities (Principle II — explainable, not black-box):
 * **The rationale is the only LLM job.** The :class:`~distil.ports.llm.Explainer` writes one
   sentence per *already-chosen* concept and cannot touch rank or signals.
 
-The service also owns the Pareto cut (~20% of concepts, hard-capped at 25% per SC-004) and builds
-the persisted :class:`RankingRun` / :class:`VitalFewEntry` objects. Every entry's evidence is the
-concept's own grounded sources, re-checked through the provenance gate before it is built, so an
+The service also owns the vital-few cut (a small, bounded set — see :func:`vital_few_size`) and
+builds the persisted :class:`RankingRun` / :class:`VitalFewEntry` objects. Every entry's evidence is
+the concept's own grounded sources, re-checked through the provenance gate before it is built, so an
 unfaithful citation can never reach storage (Principle I).
 """
 
 from __future__ import annotations
 
-import math
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from uuid import uuid4
@@ -29,11 +28,14 @@ from distil.domain.source_reference import SourceReference
 from distil.ports.llm import Explainer, ExplanationRequest
 from distil.services.provenance import keep_faithful
 
-# The Pareto target — surface roughly the vital 20% of concepts — and the hard cap from SC-004
-# (the vital few must never exceed 25% of the corpus).
-VITAL_FEW_TARGET_FRACTION = 0.20
-VITAL_FEW_MAX_FRACTION = 0.25
-# Below this many concepts a "vital few" is not meaningful (an 80/20 split of three ideas says
+# The vital few is a small, human-sized set of top concepts, NOT a fraction of the corpus. A
+# percentage breaks at both ends: on a tiny corpus (9 concepts) 20% is 2 — too few to cover the
+# core ideas — while on a larger one (211 concepts from 5 lectures) 20% is 43, which is no longer a
+# "few" anyone would study. A fixed target, clamped to the corpus, stays a meaningful handful at any
+# scale. Depth beyond these few is served by the concept hierarchy (a separate feature); this flat
+# top level is deliberately small. (Supersedes the old ~20%/25% Pareto cut — see decisions.md.)
+VITAL_FEW_TARGET_SIZE = 5
+# Below this many concepts a "vital few" is not meaningful (picking the top few of three ideas says
 # nothing); the view comes back empty with an explanatory note instead of an arbitrary shortlist.
 MIN_CONCEPTS_FOR_VITAL_FEW = 5
 
@@ -44,15 +46,15 @@ SIGNAL_WEIGHTS: dict[str, float] = {"pagerank": 0.5, "degree": 0.25, "recurrence
 
 
 def vital_few_size(total_concepts: int) -> int:
-    """How many concepts form the vital few: ~20% of the corpus, never above the 25% cap (SC-004).
+    """How many concepts form the vital few: a fixed small target, clamped to the corpus size.
 
+    :data:`VITAL_FEW_TARGET_SIZE` concepts (or fewer if the corpus is smaller), independent of the
+    corpus size, so the "few" stays a meaningful handful whether the notes yield 9 concepts or 900.
     Returns 0 when the corpus is too small (< :data:`MIN_CONCEPTS_FOR_VITAL_FEW`) to form one.
     """
     if total_concepts < MIN_CONCEPTS_FOR_VITAL_FEW:
         return 0
-    target = math.ceil(total_concepts * VITAL_FEW_TARGET_FRACTION)
-    cap = math.floor(total_concepts * VITAL_FEW_MAX_FRACTION)
-    return max(1, min(target, cap))
+    return min(VITAL_FEW_TARGET_SIZE, total_concepts)
 
 
 def _raw_signal(concept: Concept, name: str) -> float:

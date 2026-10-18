@@ -78,6 +78,39 @@ is not a precedent for logging future planned decisions here.
 
 ## Decision shifts
 
+### DS-0004 — Vital-few sizing: fixed small set (~5) instead of a percentage of the corpus
+- **Date:** 2026-10-18
+- **Status:** Accepted
+- **What changed:** `vital_few_size` now returns a **fixed target (`VITAL_FEW_TARGET_SIZE = 5`),
+  clamped to the corpus**, instead of ~20% of concepts capped at 25%. SC-004 and the spec's vital-few
+  wording were updated to match.
+- **Original plan (`spec.md` SC-004 / `plan.md`):** the vital few = a minority of concepts, target
+  ≤ 25% (a Pareto/80-20 percentage).
+- **Context / what we hit:** the eval baseline + a local run on 5 lecture PDFs showed the percentage
+  breaks at **both** ends:
+  - Tiny corpus (energy-cycle, 9 concepts): 20% → **2**. Photosynthesis and ATP were extracted and
+    correctly ranked #3/#4 but fell outside a 2-item cut, so recall was 0.40 — the metric was asking
+    for 5 important concepts out of a 2-slot list (impossible).
+  - Larger corpus (5 lectures, 211 concepts): 20% → **43**, which is not a "vital few" anyone studies.
+- **Decision:** make the vital few a small, human-sized set (~5), independent of corpus size, clamped
+  to the corpus; keep the `MIN_CONCEPTS_FOR_VITAL_FEW = 5` gate (below it the view is empty + a note).
+  Depth beyond the few is deferred to the **concept hierarchy** (specced next as its own feature).
+- **Options considered:**
+  - *Percentage with floor+ceiling* — smallest change, but still conflates "how many to show" with
+    corpus size and keeps an arbitrary band.
+  - *Natural-break (elbow) cut* — adaptive, but more logic and still unbounded at the top for a flat
+    list; better suited to building the hierarchy than to the flat top level.
+  - *Fixed small set, clamped (chosen)* — predictable, stays a real "few" at any scale, and matches
+    the product intent (a few pillars up top, drill-down via the hierarchy).
+- **Validation:** re-recorded the energy-cycle baseline (sizing change alters the explainer input, so
+  fixtures were re-recorded per Principle VII) — **faithfulness 100% (35/35), relevance 1.00**
+  (precision 0.80, recall 0.80; was 0.60/recall 0.40). Only "energy" is still missed — it is never
+  extracted as a standalone concept (a later extraction-granularity question, not a sizing one).
+  82 tests green.
+- **Rationale:** the 80/20 is a guiding spirit, not arithmetic; a percentage of a variable corpus is
+  the wrong shape for "the few ideas to study." **Revisit** `VITAL_FEW_TARGET_SIZE` once the concept
+  hierarchy lands (the hierarchy, not a bigger flat list, is how broad coverage is delivered).
+
 ### DS-0003 — Deterministic concept/edge ids + memoized per-material extraction (idempotent rebuilds)
 - **Date:** 2026-10-18
 - **Status:** Accepted
