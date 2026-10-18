@@ -99,14 +99,14 @@ implementable and testable.
 
 ### Tests for User Story 2 (write first, ensure they FAIL)
 
-- [ ] T034 [P] [US2] Contract test `GET /api/v1/graph` and `GET /api/v1/graph/edges/{id}` in `tests/contract/test_graph.py`
-- [ ] T035 [P] [US2] Integration test: nodes carry centrality/recurrence and edges carry `sources` in `tests/integration/test_graph_us2.py`
+- [x] T034 [P] [US2] Contract test `GET /api/v1/graph` and `GET /api/v1/graph/edges/{id}` in `tests/contract/test_graph.py`
+- [x] T035 [P] [US2] Integration test: nodes carry centrality/recurrence and edges carry `sources` in `tests/integration/test_graph_us2.py`
 
 ### Implementation for User Story 2
 
-- [ ] T036 [US2] Implement `GET /api/v1/graph` in `src/distil/api/routers/graph.py`: nodes (label, centrality, recurrence) + edges (kind, sources) (depends on T027, T011)
-- [ ] T037 [US2] Implement `GET /api/v1/graph/edges/{id}` returning a single edge with relationship provenance (depends on T036)
-- [ ] T038 [US2] Wire US2 routers and make T034–T035 pass
+- [x] T036 [US2] Implement `GET /api/v1/graph` in `src/distil/api/routers/graph.py`: nodes (label, centrality, recurrence) + edges (kind, sources) (depends on T027, T011)
+- [x] T037 [US2] Implement `GET /api/v1/graph/edges/{id}` returning a single edge with relationship provenance (depends on T036)
+- [x] T038 [US2] Wire US2 routers and make T034–T035 pass
 
 **Checkpoint**: Graph exploration works independently on top of the US1 graph.
 
@@ -120,14 +120,14 @@ implementable and testable.
 
 ### Tests for User Story 3 (write first, ensure they FAIL)
 
-- [ ] T039 [P] [US3] Contract test `DELETE /api/v1/materials/{id}` in `tests/contract/test_materials_delete.py`
-- [ ] T040 [P] [US3] Integration test: delete → solely-supported concepts/edges removed; re-upload dedups (no inflation) in `tests/integration/test_keep_current_us3.py`
+- [x] T039 [P] [US3] Contract test `DELETE /api/v1/materials/{id}` in `tests/contract/test_materials_delete.py`
+- [x] T040 [P] [US3] Integration test: delete → solely-supported concepts/edges removed; re-upload dedups (no inflation) in `tests/integration/test_keep_current_us3.py`
 
 ### Implementation for User Story 3
 
-- [ ] T041 [US3] Implement `DELETE /api/v1/materials/{id}` (workspace-scoped) + rebuild trigger in the materials router (depends on T031, T029)
-- [ ] T042 [US3] Implement rebuild-on-change in the pipeline: remove orphaned concepts/edges whose supporting sources are all gone; ensure re-run is idempotent (depends on T029)
-- [ ] T043 [US3] Wire US3 and make T039–T040 pass
+- [x] T041 [US3] Implement `DELETE /api/v1/materials/{id}` (workspace-scoped) + rebuild trigger in the materials router (depends on T031, T029)
+- [x] T042 [US3] Implement rebuild-on-change in the pipeline: remove orphaned concepts/edges whose supporting sources are all gone; ensure re-run is idempotent (depends on T029)
+- [x] T043 [US3] Wire US3 and make T039–T040 pass
 
 **Checkpoint**: All three user stories independently functional.
 

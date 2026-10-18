@@ -7,10 +7,11 @@ exception handlers, which render the error envelope.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, File, Form, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Response, UploadFile
 from fastapi.responses import JSONResponse
 
 from distil.api.dependencies import Services, get_services
+from distil.api.errors import error_response
 from distil.api.serializers import material_summary
 from distil.domain.material import MaterialStatus
 
@@ -49,3 +50,19 @@ def list_materials(
     """List every material in the workspace (newest-last, as stored)."""
     materials = services.materials.list_all(workspace_id)
     return JSONResponse(content={"materials": [material_summary(m) for m in materials]})
+
+
+@router.delete("/materials/{material_id}")
+def delete_material(
+    material_id: str,
+    workspace_id: str,
+    services: Services = Depends(get_services),
+) -> Response:
+    """Remove a material and rebuild the graph + ranking (US3, FR-013).
+
+    ``204`` on success; ``404`` if the material is not in this workspace.
+    """
+    deleted = services.pipeline.remove_material(workspace_id, material_id)
+    if not deleted:
+        return error_response(404, "not_found", f"Material {material_id!r} not found.")
+    return Response(status_code=204)

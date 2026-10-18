@@ -81,15 +81,34 @@ in `decisions.md`; this file tracks *activity and todos* only.
 - **Remaining known gap:** "energy" is never extracted as a standalone concept (expressed as "chemical
   energy"/"energy cycle") — an extraction-granularity question, parked.
 
+### Done today (cont.) — feature 002 specced→planned→tasked, then built feature 001 US2 + US3
+- **Feature 002 (Concept Hierarchy) through the full Spec Kit lifecycle** (all pushed):
+  `/speckit-specify` → `specs/002-concept-hierarchy/spec.md` (3 user stories, 12 FRs, 7 SCs; checklist
+  all-pass); `/speckit-plan` → plan + research + data-model + contracts/hierarchy-api + quickstart
+  (Constitution Check PASS; approach = pure `HierarchyService` building a **BFS forest** over the real
+  graph, roots = vital-few pillars, **compute-on-read, no new dep, no extra LLM call**, links only ever
+  real edges); `/speckit-tasks` → 27 tasks. **Not yet implemented.**
+- **Feature 001 US2 — graph endpoints (T034–T038): done.** `GET /api/v1/graph` (nodes with
+  centrality/recurrence + edges with grounded sources) and `GET /api/v1/graph/edges/{id}` in
+  `api/routers/graph.py` + serializers; wired into the app. Contract + integration tests.
+- **Feature 001 US3 — keep current (T039–T043): done.** `DELETE /api/v1/materials/{id}` →
+  `Pipeline.remove_material` (delete + batch rebuild). Orphan removal is **automatic**: `replace_graph`
+  wipes-and-rewrites, so a rebuild from the remaining materials drops concepts/edges the deleted
+  material solely supported; re-uploading an identical file dedups (no inflation). Contract +
+  integration tests prove both.
+- **91 tests green** (+9: graph contract/integration, delete contract, keep-current integration); ruff
+  + format + mypy clean; eval replay still **faithfulness 100% / relevance 1.00** (no regression).
+  All three of feature 001's user stories are now implemented.
+
 ### Pick up here next time
-1. **Spec the concept hierarchy** (the agreed next feature): a few root "pillars" (most central /
-   recurring) with other concepts branching underneath via graph connectivity — this is how broad
-   coverage/depth is delivered beyond the flat top-5. Pairs with US2 (graph view). Needs spec + ADR +
-   its own evals. *(In progress — specced right after DS-0004.)*
-2. **US2 (T034–T038)** graph endpoints, then **US3 (T039–T043)**; durable per-material-mentions
-   persistence (DS-0003 deferred) belongs with US3's delete/rebuild.
-3. Optional smaller levers: extraction-noise reduction (proper nouns / slide fragments) and
-   recurrence-vs-degree reweighting — now measurable against the harness.
+1. **Implement feature 002 (concept hierarchy)** — tasks ready in `specs/002-concept-hierarchy/tasks.md`
+   (MVP = US1, T001–T012). `/speckit-implement` or start at T001. T018 references 001's delete (now
+   done), so that dependency is cleared.
+2. **Finish feature 001 polish**: T046 (edge-case tests), T047 (README + Principle V caveat), T048
+   (harden LLM adapter messages), T049 (ruff/mypy sweep — currently clean), T050 (quickstart vs a live
+   model), T051 (release gate). T044/T045 already done.
+3. Optional measurable levers (now that the graph endpoints exist to inspect): extraction-noise
+   reduction (proper nouns / slide fragments) and recurrence-vs-degree reweighting.
 
 ---
 

@@ -49,6 +49,20 @@ class Pipeline:
             self.rebuild(workspace_id)
         return result
 
+    def remove_material(self, workspace_id: str, material_id: str) -> bool:
+        """Delete one material and rebuild; return True if a material was removed (US3, FR-013).
+
+        The batch rebuild (ADR-0007) recomputes the whole view from the *remaining* accepted
+        materials, so concepts/edges that only the deleted material supported are naturally gone
+        (``replace_graph`` wipes and rewrites) — no separate orphan-sweep needed. Deleting a
+        material that does not exist changes nothing and returns False.
+        """
+        self._workspaces.ensure(workspace_id)
+        deleted = self._materials.delete(workspace_id, material_id)
+        if deleted:
+            self.rebuild(workspace_id)
+        return deleted
+
     def rebuild(self, workspace_id: str) -> RankingRun:
         """Recompute the concept graph and the 80/20 ranking for the whole workspace."""
         self._workspaces.ensure(workspace_id)

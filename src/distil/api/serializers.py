@@ -12,6 +12,7 @@ from typing import Any
 from distil.domain.concept import Concept
 from distil.domain.material import Material
 from distil.domain.ranking import RankingRun, VitalFewEntry
+from distil.domain.relationship import Relationship
 from distil.domain.source_reference import SourceReference
 
 
@@ -48,6 +49,39 @@ def concept_detail(concept: Concept) -> dict[str, Any]:
         "recurrence_count": concept.recurrence_count,
         "centrality": concept.centrality,
         "sources": [source_ref(s) for s in concept.sources],
+    }
+
+
+def graph_node(concept: Concept) -> dict[str, Any]:
+    """GET /graph node: label + the graph signals used for ranking (no sources here; the concept
+    detail endpoint carries provenance)."""
+    return {
+        "id": concept.id,
+        "label": concept.label,
+        "centrality": concept.centrality,
+        "recurrence_count": concept.recurrence_count,
+    }
+
+
+def graph_edge(relationship: Relationship) -> dict[str, Any]:
+    """GET /graph edge: the relationship with its grounding passage(s) — always non-empty
+    (the Relationship invariant guarantees >= 1 source, the faithfulness guarantee)."""
+    return {
+        "id": relationship.id,
+        "source": relationship.source_concept_id,
+        "target": relationship.target_concept_id,
+        "kind": relationship.kind,
+        "sources": [source_ref(s) for s in relationship.sources],
+    }
+
+
+def graph_view(
+    concepts: Sequence[Concept], relationships: Sequence[Relationship]
+) -> dict[str, Any]:
+    """GET /graph: nodes (with centrality/recurrence) + edges (with source provenance)."""
+    return {
+        "nodes": [graph_node(c) for c in concepts],
+        "edges": [graph_edge(r) for r in relationships],
     }
 
 
