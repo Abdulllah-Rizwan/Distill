@@ -5,6 +5,77 @@ in `decisions.md`; this file tracks *activity and todos* only.
 
 ---
 
+## 2026-10-18
+
+### Context — eval baseline blocked by Gemini quota, pivoted to a DeepSeek provider
+- **Tried to record the eval baseline first thing** (`evals.harness --live --dataset energy-cycle`).
+  Replay seam verified (fails cleanly on missing fixtures). **Still 429 `RESOURCE_EXHAUSTED`** — the
+  free-tier daily window does **not** reset at local midnight; the 429 returns `retryDelay ~20h`.
+  Nothing recorded, working tree untouched. Also learned: the 429 labels the bucket `gemini-3-flash`
+  even though we call `gemini-3-flash-preview` — **both share one 20/day quota bucket** (config is
+  correct; DS-0001 confirmed in effect). Updated the quota memory with the reset-timing correction.
+
+### Done today — DeepSeek LLM provider added (decision-shift DS-0002, milestone #2 = first DeepSeek call)
+- **Author added a DeepSeek API key** and asked to develop against it until its credit runs out
+  (Gemini quota being the blocker). Implemented a pluggable provider behind the existing `JsonLLM`
+  port — logged as **DS-0002** (decisions.md).
+- **Refactor (promote the already-neutral core):** the extractor, explainer, and prompts only ever
+  depended on the narrow `JsonLLM` port, so they moved out of `adapters/llm/gemini/` up to
+  `adapters/llm/` (`extractor.py`, `explainer.py`, `prompts.py`, new `base.py` = `JsonLLM` protocol +
+  a now provider-agnostic `with_retries`). Classes renamed `GeminiConceptExtractor`/`GeminiExplainer`
+  → `JsonConceptExtractor`/`JsonExplainer`. `gemini/` keeps only `GeminiClient`.
+- **New `adapters/llm/deepseek/`:** `DeepSeekClient` — a thin `httpx` POST to the OpenAI-compatible
+  `/chat/completions` (no new dependency; `httpx` already transitive). JSON **mode** + schema injected
+  into the prompt (DeepSeek has no server-side schema); response re-validated against the Pydantic
+  model as before. Retries reuse the shared policy (429/5xx + transport errors; **402 out-of-credit
+  propagates immediately**, no retry loop).
+- **Config/wiring:** new `LLM_PROVIDER` setting (default `gemini`) + `DEEPSEEK_API_KEY/MODEL/BASE_URL`
+  fields; `build_llm_provider` and the eval harness `--live` client both dispatch on it. `.env.example`
+  updated.
+- **First live DeepSeek call (synthetic non-sensitive snippet, Principle V):** 3 concepts + 2
+  relationships, **all spans faithful** (`quote == source slice`). Integration validated.
+- **Everything green:** ruff + format + mypy (configured `uv run mypy`, 51 files) clean; **79 tests**
+  (was 71; +7 DeepSeek client tests via `httpx.MockTransport`, + a generalized-retry test; the old
+  `test_gemini_adapter.py` became the neutral `test_llm_adapters.py`).
+
+### Done today (cont.) — first eval baseline recorded + two pipeline defects the baseline exposed
+- Set `LLM_PROVIDER=deepseek` (user, in `.env`) and ran `evals.harness --live --dataset energy-cycle`.
+  Recording worked but **replay `LookupError`'d on the explainer** — tracing (per-call key hit/miss)
+  found **two real defects**, now fixed and logged as **DS-0003**:
+  1. **Non-deterministic ids** — concept/edge ids were `uuid4`, and the explainer prompt embeds the
+     concept id, so recorded fixtures couldn't be matched/replayed. Fix: ids derived from identity
+     (`c_<sha256(workspace|label)>`, `e_<sha256(workspace|src|tgt|kind)>`). Bonus: ids are now stable
+     across rebuilds (US2/US3 lookups).
+  2. **Re-extraction on every rebuild** — `GraphBuilder.build` re-ran the LLM on *all* materials each
+     rebuild (3× the quota here) and, being non-deterministic, made rebuilds non-idempotent and the
+     intermediate graph states unrecordable. Fix: **memoize extraction per material** (process-level;
+     the Pipeline/GraphBuilder is a singleton). Durable fix (persist per-material mentions) deferred —
+     see DS-0003; dovetails with US3.
+- **Baseline recorded + reproducible:** replay now reproduces the live run **exactly and stably across
+  repeated replays**, at zero quota. First real numbers (energy-cycle, DeepSeek):
+  **faithfulness 100% (30/30 spans grounded), relevance 0.60** (judge 0.60; precision 1.00, recall
+  0.40). `fixtures.json` written (6 entries).
+- **Honest quality signal (feeds extraction tuning):** vital-few = {Glucose, Cellular Respiration};
+  the judge correctly flags that **Photosynthesis and ATP are missing** though they recur across all
+  three notes (recall 0.40). Faithfulness is perfect; **recall/extraction completeness is the gap.**
+- **81 tests green** (+2: extraction memoized across rebuilds; ids deterministic across builds); ruff
+  + format + mypy clean. `fixtures.json` is a versioned asset (DS-0002: **provider-specific** — the
+  current baseline is DeepSeek; re-record if the provider changes).
+
+### Pick up here next time
+1. **Tick T044/T045** in tasks.md (eval harness + dataset: now recorded & reproducible) and **commit**
+   today's work if not already (DeepSeek provider DS-0002, determinism fixes DS-0003, fixtures).
+2. **Raise extraction recall** — the measurable 80/20 blocker: the baseline misses recurring concepts
+   (Photosynthesis, ATP). Tune the extraction prompt; re-run `--live` (budget DeepSeek credit) and
+   watch recall/relevance move while faithfulness stays 100%. Decide cross-material concept identity
+   (exact vs. normalised/fuzzy) → a decisions.md entry.
+3. **US2 (T034–T038)** graph endpoints, then **US3 (T039–T043)** — the durable per-material-mentions
+   persistence (DS-0003 deferred) belongs with US3's delete/rebuild.
+4. ⚠️ **Not yet committed** — working tree holds the DeepSeek provider, determinism fixes, docs, and
+   `fixtures.json`. Commit when ready.
+
+---
+
 ## 2026-10-17
 
 ### Done today — first real Gemini calls (milestone #1)

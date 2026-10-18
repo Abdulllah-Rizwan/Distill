@@ -7,17 +7,22 @@ concepts → compute centrality signals. Returns concepts (with signals) + relat
 
 from __future__ import annotations
 
+import hashlib
 from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import replace
-from uuid import uuid4
 
 from distil.domain.concept import Concept
 from distil.domain.material import Material
 from distil.domain.relationship import Relationship
 from distil.domain.source_reference import SourceReference
 from distil.ports.graph import GraphAnalyzer
-from distil.ports.llm import ConceptExtractor, ConceptMention, RelationshipMention
+from distil.ports.llm import (
+    ConceptExtractor,
+    ConceptMention,
+    ExtractionResult,
+    RelationshipMention,
+)
 from distil.services.provenance import is_faithful
 
 
@@ -26,10 +31,30 @@ def _key(label: str) -> str:
     return label.strip().casefold()
 
 
+def _stable_id(prefix: str, *parts: str) -> str:
+    """A deterministic id from identity-defining parts (a concept's label, or an edge's endpoints).
+
+    Derived, not random, so the same concept/edge keeps the same id across rebuilds and across
+    separate runs on identical input. That makes ids stable for clients holding them (US2/US3 graph
+    and edge lookups) and lets the eval harness record/replay the explainer, whose prompt embeds the
+    concept id, deterministically. The parts are null-separated so distinct inputs cannot collide.
+    """
+    digest = hashlib.sha256("\x00".join(parts).encode("utf-8")).hexdigest()
+    return f"{prefix}_{digest[:24]}"
+
+
 class GraphBuilder:
     def __init__(self, extractor: ConceptExtractor, analyzer: GraphAnalyzer) -> None:
         self._extractor = extractor
         self._analyzer = analyzer
+        # Extraction is memoized per material: a material's content is immutable (content_hash
+        # dedup), so re-extracting it on every workspace rebuild would be wasted LLM calls (and
+        # free-tier quota), and — with a non-deterministic model — would make rebuilds
+        # non-idempotent: adding material N would silently re-roll the extraction of materials
+        # 1..N-1 and reshape the existing graph. Caching makes each material extracted exactly once
+        # per process. (A server-restart cold cache re-extracts once; the durable fix is to persist
+        # per-material mentions — future work, alongside US3 delete/rebuild.)
+        self._extractions: dict[str, ExtractionResult] = {}
 
     def build(
         self, workspace_id: str, materials: Sequence[Material]
@@ -39,7 +64,7 @@ class GraphBuilder:
         concept_mentions: list[ConceptMention] = []
         relationship_mentions: list[RelationshipMention] = []
         for material in materials:
-            result = self._extractor.extract(material)
+            result = self._extract(material)
             concept_mentions.extend(result.concepts)
             relationship_mentions.extend(result.relationships)
 
@@ -51,6 +76,14 @@ class GraphBuilder:
         signals = self._analyzer.compute_signals(concepts, relationships)
         concepts = [replace(c, centrality=signals.get(c.id)) for c in concepts]
         return concepts, relationships
+
+    def _extract(self, material: Material) -> ExtractionResult:
+        """Extract a material's mentions, reusing the cached result if it was extracted before."""
+        cached = self._extractions.get(material.id)
+        if cached is None:
+            cached = self._extractor.extract(material)
+            self._extractions[material.id] = cached
+        return cached
 
     def _merge_concepts(
         self,
@@ -71,7 +104,7 @@ class GraphBuilder:
             aliases = tuple(sorted({m.label.strip() for m in group} - {canonical}))
             recurrence = len({s.material_id for s in sources})
             concept = Concept(
-                id=f"c_{uuid4().hex}",
+                id=_stable_id("c", workspace_id, key),
                 workspace_id=workspace_id,
                 label=canonical,
                 sources=sources,
@@ -101,7 +134,7 @@ class GraphBuilder:
 
         return [
             Relationship(
-                id=f"e_{uuid4().hex}",
+                id=_stable_id("e", workspace_id, src_id, tgt_id, kind or ""),
                 workspace_id=workspace_id,
                 source_concept_id=src_id,
                 target_concept_id=tgt_id,

@@ -78,6 +78,94 @@ is not a precedent for logging future planned decisions here.
 
 ## Decision shifts
 
+### DS-0003 — Deterministic concept/edge ids + memoized per-material extraction (idempotent rebuilds)
+- **Date:** 2026-10-18
+- **Status:** Accepted
+- **What changed:** Two coupled changes to `services/graph_builder.py`, both making a workspace
+  rebuild **deterministic and idempotent**:
+  1. Concept and relationship ids are now **derived** from identity (`c_<sha256(workspace|label)>`,
+     `e_<sha256(workspace|src|tgt|kind)>`) instead of random `uuid4`.
+  2. Extraction is **memoized per material** — each material is sent to the LLM at most once per
+     process, instead of re-extracting every material on every rebuild.
+- **Original plan / implementation:** `uuid4()` ids minted fresh on each rebuild, and
+  `GraphBuilder.build` calling `extractor.extract(material)` for *every* material on *every* rebuild
+  (the batch-on-every-change pipeline, ADR-0007 / plan.md).
+- **Context / what we hit (recording the first eval baseline):** `--live` recorded fixtures fine,
+  but replay raised `LookupError` on the **explainer** call. Tracing showed two independent defects
+  the baseline exposed:
+  - *Non-deterministic ids.* The explainer's prompt embeds each concept's id, so random ids made the
+    recorded fixture key (and the recorded response's id→sentence map) unreproducible on replay.
+  - *Re-extraction on every rebuild.* Ingesting notes sequentially re-ran the LLM on earlier
+    materials each time; with a non-deterministic model each re-extraction differed, and the fixture
+    store keeps only the last extraction per passage (same input → same key → overwritten). So the
+    intermediate 2-material graph the live explainer saw was built from extractions no longer in the
+    fixtures — only the final full-corpus state replayed. (It was also 3× the LLM calls / quota.)
+- **Decision:** Derive ids from stable identity, and memoize extraction per `material.id` in the
+  builder (a process-level cache; the `Pipeline`/`GraphBuilder` is a singleton, so a running server
+  is idempotent for its lifetime). A server-restart cold cache re-extracts once.
+- **Options considered:**
+  - *Fix only the eval harness (e.g. ingest-all-then-rebuild-once)* — rejected: hides a real
+    production defect (non-idempotent rebuilds, wasted quota) behind the test.
+  - *Persist per-material mentions in SQLite now* — the durable, correct end-state (survives restart,
+    and is what US3 delete/rebuild wants), but a schema + repository change out of scope for
+    unblocking the baseline. **Deferred as future work** (flagged in progress.md), with the in-memory
+    memo as the simple shipping step (Principle VI).
+  - *Deterministic ids + in-memory memo (chosen)* — minimal, understandable, fixes both the replay
+    seam and the real idempotency/quota defects; ids are now stable for clients holding them (US2/US3
+    graph and edge lookups), a bonus beyond the eval fix.
+- **Validation:** 81 tests green (new: extraction memoized across rebuilds; ids deterministic across
+  builds). Re-recorded the baseline; **replay now reproduces the live run exactly and is stable across
+  repeated replays** (faithfulness 100% (30/30), relevance 0.60), at zero quota.
+- **Rationale:** Rebuilds must be idempotent for the evals (Principle VII) and for a trustworthy
+  product — adding a material should not silently re-roll the rest of the graph. **Revisit** when
+  per-material mentions are persisted (the durable fix), which also lets ranking skip rebuild work
+  for unchanged corpora.
+
+### DS-0002 — Add a DeepSeek LLM provider alongside Gemini, selectable via `LLM_PROVIDER`
+- **Date:** 2026-10-18
+- **Status:** Accepted
+- **What changed:** The LLM backend is now pluggable between **Gemini** and **DeepSeek** behind the
+  same `JsonLLM` port, chosen by a new `LLM_PROVIDER` setting (default `gemini`). DeepSeek is used
+  for active development while the Gemini free-tier daily quota is exhausted.
+- **Original plan (`plan.md` / `research.md`):** A single provider — Google Gemini 3 Flash, free
+  tier — behind the LLM provider port, with "swap to a more capable model later" noted as a future
+  shift.
+- **Context / what we hit:** The Gemini free tier is **20 `generate_content`/day/model** and the
+  window does **not** reset at local midnight (the 429 returns a ~20h `retryDelay`), so a day's
+  development can be blocked for most of the next day. To keep building and to record the first eval
+  baseline without waiting on quota, the author added a DeepSeek API key and asked to develop against
+  it until its credit runs out.
+- **Decision:** Introduce a DeepSeek adapter and make the provider a config switch:
+  - The extractor, explainer, and prompts were **already provider-neutral** (they depend only on the
+    narrow `JsonLLM` port), so they were promoted out of `adapters/llm/gemini/` to `adapters/llm/`
+    (`extractor.py`, `explainer.py`, `prompts.py`, and a new `base.py` holding the `JsonLLM` protocol
+    and a now provider-agnostic `with_retries`). Classes renamed `Gemini*` → `Json*`.
+  - `adapters/llm/gemini/` keeps only `GeminiClient`; new `adapters/llm/deepseek/` adds
+    `DeepSeekClient` — a thin `httpx` POST to the OpenAI-compatible `/chat/completions` (no new SDK
+    dependency; `httpx` is already transitive). DeepSeek supports JSON **mode** but not server-side
+    JSON **schema**, so the schema is injected into the system prompt and the response is validated
+    against the Pydantic model on our side (the adapters already drop malformed output — Principle I
+    defence in depth, unchanged).
+  - `build_llm_provider` dispatches on `settings.llm_provider`; the eval harness `--live` client does
+    the same, so a baseline can be recorded against either provider.
+- **Options considered:**
+  - *Wait ~20h for Gemini quota* — rejected: blocks the baseline and all live iteration for most of a
+    day, repeatedly.
+  - *Install the `openai` SDK for DeepSeek* — rejected: an OpenAI-compatible chat call is a simple
+    POST; a thin `httpx` client needs no new dependency and keeps the exact request reviewable
+    (Principle IV, VI).
+  - *Quick drop-in: a DeepSeek client reusing the `Gemini*`-named classes in place* — rejected: a
+    "Gemini extractor" wrapping a DeepSeek client is a lasting naming lie; promoting the already-
+    neutral core is the honest, cohesive structure (Principle VIII) at modest, mechanical churn.
+- **Validation:** 79 deterministic tests green (ruff + format + mypy clean); first live DeepSeek call
+  (one synthetic non-sensitive snippet, Principle V) returned grounded concepts/relationships with
+  **100% faithful spans** (`quote == source slice`).
+- **Rationale:** Preserves the plan's architecture (one LLM port, swappable adapter) and unblocks
+  development and the eval baseline without burning scarce Gemini quota. Default stays `gemini` as
+  the planned provider; DeepSeek is opt-in via `.env`. **Revisit** the default when choosing the
+  product's long-term model, and note that evals recorded against DeepSeek are provider-specific
+  fixtures (re-record if the provider changes).
+
 ### DS-0001 — Gemini model id `gemini-3-flash` → `gemini-3-flash-preview`, and disable model "thinking" for our calls
 - **Date:** 2026-10-17
 - **Status:** Accepted

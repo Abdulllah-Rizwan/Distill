@@ -137,8 +137,8 @@ implementable and testable.
 
 **Purpose**: Evals, edge-case coverage, hardening, and the release gate.
 
-- [ ] T044 [P] Build the eval harness in `evals/harness/` (`python -m evals.harness`): **faithfulness** scored deterministically (every emitted concept/edge/ranking resolves to a real source span — any ungrounded item fails) + **relevance** via an LLM-judge; thresholds that gate prompt/model/pipeline changes
-- [ ] T045 [P] Create curated, versioned eval dataset(s) in `evals/datasets/` (sample notes + expected groundings and "most important" concept labels)
+- [x] T044 [P] Build the eval harness in `evals/harness/` (`python -m evals.harness`): **faithfulness** scored deterministically (every emitted concept/edge/ranking resolves to a real source span — any ungrounded item fails) + **relevance** via an LLM-judge; thresholds that gate prompt/model/pipeline changes — **done: recorded-fixture replay (0 quota) + `--live`; baseline recorded 2026-10-18 (DeepSeek): faithfulness 100%, relevance 0.60**
+- [x] T045 [P] Create curated, versioned eval dataset(s) in `evals/datasets/` (sample notes + expected groundings and "most important" concept labels) — **done: `evals/datasets/energy-cycle/` (3 synthetic notes engineered for cross-material recurrence) + recorded `fixtures.json`**
 - [ ] T046 [P] Unit tests for edge cases in `tests/unit/test_edge_cases.py`: empty/single material, too-small corpus (empty vital-few + note), conflicting cross-material statements kept (not silently resolved)
 - [ ] T047 [P] Write `README.md` (setup/run per `quickstart.md`); document the Principle V Gemini free-tier data-use caveat prominently
 - [ ] T048 Harden Gemini adapter: rate-limit throttle/backoff and clear user-facing messages on LLM failure/timeout
