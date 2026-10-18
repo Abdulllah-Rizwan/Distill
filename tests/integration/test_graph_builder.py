@@ -86,6 +86,34 @@ def test_extraction_is_memoized_per_material_across_rebuilds() -> None:
     assert extractor.calls == {"m1": 1, "m2": 1}
 
 
+class _AcronymExtractor:
+    """m1 mentions the expansion 'Infrastructure as a Service (IaaS)'; m2 mentions bare 'IaaS'."""
+
+    def extract(self, material: Material) -> ExtractionResult:
+        text = material.content_text
+        ref = SourceReference(
+            material_id=material.id, start_offset=0, end_offset=len(text), quote=text
+        )
+        label = "Infrastructure as a Service (IaaS)" if "(IaaS)" in text else "IaaS"
+        return ExtractionResult(
+            concepts=(ConceptMention(label=label, source=ref),), relationships=()
+        )
+
+
+def test_acronym_and_expansion_merge_into_one_concept() -> None:
+    m1 = _material("m1", "Infrastructure as a Service (IaaS) is a cloud model.")
+    m2 = _material("m2", "IaaS underpins the platform.")
+    builder = GraphBuilder(_AcronymExtractor(), NetworkxGraphAnalyzer())
+
+    concepts, _relationships = builder.build("w1", [m1, m2])
+
+    assert len(concepts) == 1  # the acronym merged into its defining expansion (DS-0005)
+    merged = concepts[0]
+    assert merged.label == "Infrastructure as a Service (IaaS)"  # expansion is canonical
+    assert "IaaS" in merged.aliases
+    assert merged.recurrence_count == 2  # both materials now count toward the one concept
+
+
 def test_concept_ids_are_deterministic_across_builds() -> None:
     """Identical input yields identical concept ids, so ids are stable for clients and replay."""
     m1 = _material("m1", "Alpha leads to Beta")

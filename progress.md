@@ -152,11 +152,25 @@ in `decisions.md`; this file tracks *activity and todos* only.
 - **Feature 002 (concept hierarchy): COMPLETE** (US1–US3 + evals + docs + gate).
 - Everything green and pushed to GitHub `main`.
 
+### Done today (cont.) — extraction tuning #1: acronym/expansion concept merge (DS-0005)
+- **Grounded the work in data** (read-only analysis of the 211-concept lecture graph): **49%
+  edge-less** (relationship recall = the big lever, separate), **0** punctuation/casing collisions,
+  and **4 acronym/expansion pairs** — all core concepts (IaaS, PaaS, SaaS, AWS) wrongly split.
+- **Implemented acronym↔expansion merge** in `graph_builder` (DS-0005): a bare acronym merges into the
+  parenthetical expansion that defines it, **only when both were extracted** (grounded, deterministic,
+  no LLM/quota). Expansion canonical, acronym alias, sources + recurrence combined. Fixed a generator
+  double-consume bug found by the test. Unit test added; **127 tests green**; energy-cycle eval
+  unchanged (no acronyms → no regression). Expected lecture effect: the 4 core pairs consolidate
+  (higher recurrence/centrality, no duplicated pillars).
+
 ### Pick up here next time
-1. **Extraction tuning — the top quality lever** (relationship recall + label merging; ~half the
-   lecture concepts are edge-less). Measurable against the harness; a `decisions.md` entry on concept
-   identity (exact vs normalised/fuzzy merge). Budget `--live` DeepSeek re-records.
-2. Optional: recurrence-vs-degree ranking-weight tuning (eval-tunable); a thin TS frontend over the API.
+1. **Relationship-recall prompt tuning — the biggest remaining lever** (49% of lecture concepts are
+   edge-less). This is an extraction-prompt change in `adapters/llm/prompts.py`, so it needs a **live
+   DeepSeek re-run on the lectures** to measure the edge-less rate before/after (energy-cycle is
+   already well-connected and won't show it). Consider adding an "orphan rate" metric to the eval
+   report. Keep faithfulness 100% (every relationship still needs a verbatim quote). Budget the credit.
+2. Optional: broader (non-acronym) synonym merging once a merge-quality eval metric exists;
+   recurrence-vs-degree ranking-weight tuning; a thin TS frontend over the API.
 
 ### Pick up here next time
 1. **Extraction tuning — the highest-leverage quality work now.** The hierarchy made it visceral:

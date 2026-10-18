@@ -78,6 +78,41 @@ is not a precedent for logging future planned decisions here.
 
 ## Decision shifts
 
+### DS-0005 — Concept identity: merge an acronym into its defining parenthetical expansion
+- **Date:** 2026-10-18
+- **Status:** Accepted
+- **What changed:** Concept merging (`graph_builder._merge_concepts`) now treats a bare acronym and
+  the expansion that defines it in parentheses as the **same concept** — e.g. `IaaS` merges into
+  `Infrastructure as a Service (IaaS)` (expansion canonical, acronym an alias). Previously the merge
+  key was exact casefold, so the two were separate concepts.
+- **Original plan / implementation:** merge by `label.strip().casefold()` only (DS-0003 era). The
+  open question "cross-material concept identity: exact vs normalised/fuzzy" was flagged in
+  `progress.md` as pending a decision — this resolves the first slice of it.
+- **Context / what we hit:** eyeballing the 5-lecture graph (211 concepts) with the new hierarchy and
+  a read-only analysis showed: **49% of concepts are edge-less** (the big lever — relationship recall,
+  separate work), **0** punctuation/casing collisions (so generic normalisation would merge nothing),
+  and exactly **4 acronym/expansion pairs** — and all four are the course's *core* concepts
+  (`IaaS`, `PaaS`, `SaaS`, `AWS`). Splitting them halved their recurrence/centrality and duplicated
+  pillars in the hierarchy.
+- **Decision:** merge acronym↔expansion, but **only when both forms were actually extracted** from the
+  notes (the expansion literally defines the acronym in parentheses, so the link is grounded in the
+  text, not invented — Principle I). The expansion is the canonical label; the acronym becomes an
+  alias; sources combine and recurrence counts distinct materials across both forms. Deterministic,
+  no LLM call, zero quota.
+- **Options considered:**
+  - *Exact casefold only (status quo)* — leaves core concepts split; rejected.
+  - *Generic punctuation/whitespace normalisation* — the data showed 0 such collisions; wouldn't help.
+  - *Fuzzy / embedding similarity merge* — powerful but non-deterministic, hard to keep faithful and
+    reproducible, and over-engineered for v1 (Principle VI). Deferred; revisit only if evals demand it.
+  - *Acronym↔expansion, both-present-only (chosen)* — targeted, explainable, grounded, deterministic.
+- **Validation:** unit test (expansion + bare acronym across two materials → one concept, alias set,
+  recurrence 2); full suite 127 green; energy-cycle eval unchanged (no acronyms there → no regression,
+  faithfulness 100% / relevance 1.00). Expected lecture effect: the 4 core pairs consolidate.
+- **Rationale:** consolidating acronym variants fixes duplicated pillars and restores the recurrence
+  signal for the most important concepts, at zero quota and full faithfulness. **Revisit** for broader
+  synonymy (non-acronym) once there is an eval metric for merge quality; **relationship recall**
+  (the 49% edge-less finding) is the larger, separate extraction-prompt lever, tracked next.
+
 ### DS-0004 — Vital-few sizing: fixed small set (~5) instead of a percentage of the corpus
 - **Date:** 2026-10-18
 - **Status:** Accepted

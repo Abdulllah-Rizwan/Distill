@@ -8,8 +8,9 @@ concepts → compute centrality signals. Returns concepts (with signals) + relat
 from __future__ import annotations
 
 import hashlib
+import re
 from collections import defaultdict
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import replace
 
 from distil.domain.concept import Concept
@@ -29,6 +30,33 @@ from distil.services.provenance import is_faithful
 def _key(label: str) -> str:
     """Normalized grouping key so the same idea phrased differently merges into one concept."""
     return label.strip().casefold()
+
+
+# An acronym defined in parentheses, e.g. the "IaaS" in "Infrastructure as a Service (IaaS)".
+_ACRONYM_RE = re.compile(r"\(([A-Za-z][A-Za-z0-9]{1,})\)")
+
+
+def _canonical_key_map(labels: Iterable[str]) -> dict[str, str]:
+    """Map each concept key to a canonical key, merging an acronym into its defining expansion.
+
+    A label like "Infrastructure as a Service (IaaS)" defines the acronym "IaaS" in the material's
+    own words, so a separately-extracted bare "IaaS" is the same concept — they merge, with the
+    expansion canonical and the acronym an alias (DS-0005). It fires ONLY when both forms were
+    actually extracted from the notes, so no identity is invented (Principle I); casing/whitespace
+    variants already share a key via :func:`_key`.
+    """
+    labels = list(labels)  # may be a one-shot generator; we iterate it twice below
+    keys = {_key(label) for label in labels}
+    canon = {k: k for k in keys}
+    for label in labels:
+        match = _ACRONYM_RE.search(label)
+        if match is None:
+            continue
+        acronym_key = _key(match.group(1))
+        expansion_key = _key(label)
+        if acronym_key in keys and acronym_key != expansion_key:
+            canon[acronym_key] = expansion_key
+    return canon
 
 
 def _stable_id(prefix: str, *parts: str) -> str:
@@ -91,20 +119,28 @@ class GraphBuilder:
         mentions: Sequence[ConceptMention],
         materials_by_id: dict[str, Material],
     ) -> tuple[list[Concept], dict[str, str]]:
+        # provenance gate: drop any mention whose span is not faithful to its material
+        faithful = [m for m in mentions if is_faithful(m.source, materials_by_id)]
+        canon = _canonical_key_map(m.label for m in faithful)
+
         groups: dict[str, list[ConceptMention]] = defaultdict(list)
-        for mention in mentions:
-            if is_faithful(mention.source, materials_by_id):  # provenance gate
-                groups[_key(mention.label)].append(mention)
+        for mention in faithful:
+            groups[canon[_key(mention.label)]].append(mention)
 
         concepts: list[Concept] = []
-        key_to_id: dict[str, str] = {}
-        for key, group in groups.items():
+        canonical_id: dict[str, str] = {}
+        for group_key, group in groups.items():
             sources = tuple(m.source for m in group)
-            canonical = group[0].label.strip()
+            # Canonical label: prefer the expansion (the mention whose own key is the group key),
+            # else the first mention; the other distinct labels (e.g. the acronym) become aliases.
+            canonical = next(
+                (m.label.strip() for m in group if _key(m.label) == group_key),
+                group[0].label.strip(),
+            )
             aliases = tuple(sorted({m.label.strip() for m in group} - {canonical}))
             recurrence = len({s.material_id for s in sources})
             concept = Concept(
-                id=_stable_id("c", workspace_id, key),
+                id=_stable_id("c", workspace_id, group_key),
                 workspace_id=workspace_id,
                 label=canonical,
                 sources=sources,
@@ -112,7 +148,11 @@ class GraphBuilder:
                 aliases=aliases,
             )
             concepts.append(concept)
-            key_to_id[key] = concept.id
+            canonical_id[group_key] = concept.id
+
+        # Every raw key (acronym forms included) resolves to its merged concept, so relationships
+        # that cite either form land on the same node.
+        key_to_id = {raw_key: canonical_id[c_key] for raw_key, c_key in canon.items()}
         return concepts, key_to_id
 
     def _build_relationships(
