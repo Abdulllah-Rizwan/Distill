@@ -27,6 +27,7 @@ from distil.config import Settings, get_settings
 from distil.ports.llm import ConceptExtractor, Explainer
 from distil.ports.repositories import GraphRepository, MaterialRepository
 from distil.services.graph_builder import GraphBuilder
+from distil.services.hierarchy import HierarchyService
 from distil.services.ingestion import IngestionService
 from distil.services.pipeline import Pipeline
 from distil.services.ranking import RankingService
@@ -39,6 +40,7 @@ class Services:
     materials: MaterialRepository
     graph: GraphRepository
     pipeline: Pipeline
+    hierarchy: HierarchyService
 
 
 def build_services(
@@ -55,7 +57,9 @@ def build_services(
     builder = GraphBuilder(extractor, NetworkxGraphAnalyzer())
     ranking = RankingService(explainer)
     pipeline = Pipeline(workspaces, materials, graph, ingestion, builder, ranking)
-    return Services(materials=materials, graph=graph, pipeline=pipeline)
+    return Services(
+        materials=materials, graph=graph, pipeline=pipeline, hierarchy=HierarchyService()
+    )
 
 
 def build_llm_provider(settings: Settings) -> tuple[ConceptExtractor, Explainer]:

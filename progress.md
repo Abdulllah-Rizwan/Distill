@@ -100,15 +100,34 @@ in `decisions.md`; this file tracks *activity and todos* only.
   + format + mypy clean; eval replay still **faithfulness 100% / relevance 1.00** (no regression).
   All three of feature 001's user stories are now implemented.
 
+### Done today (cont.) — feature 002 concept hierarchy implemented (US1–US3, T001–T020 + edge cases)
+- **Built the concept hierarchy** per plan: `domain/hierarchy.py` (`HierarchyNode` + `ConceptHierarchy`
+  value objects with faithfulness/coverage invariants), `services/hierarchy.py` (pure, deterministic
+  `HierarchyService.build` — roots = vital-few pillars, layered multi-source **BFS forest** over the
+  undirected relationship graph, secondary roots for pillar-less components, edge-less concepts →
+  `unplaced`, deterministic placement reasons, **no LLM call**), serializers (recursive nested DTO),
+  router `GET /api/v1/hierarchy` + `GET /api/v1/hierarchy/concepts/{id}`, wired via a `HierarchyService`
+  on `Services`.
+- **Faithful by construction:** a parent→child link is only ever a real relationship edge (its sources
+  become the child's `grounding`); nothing attached without an edge.
+- **27 tests added** (domain invariants, service root/BFS/tie-break/coverage/determinism, contract
+  faithfulness+shape, integration link-is-real-edge/coverage/reproducible/add-delete, 3 edge cases).
+  **115 tests green**; ruff + format + mypy clean; eval replay unchanged (faithfulness 100%).
+- **Eyeballed on the 5 lectures** (211 concepts, read-only scratch DB): 5 pillars (SaaS, PaaS,
+  Monolithic/Microservices architecture, Microservices lifecycle) + 19 secondary roots; coherent
+  multi-level subtrees (e.g. PaaS → Availability → Fault tolerance). **Honest finding: 104/211 concepts
+  are `unplaced` (edge-less)** — correct (no invented links), and it shows the quality ceiling is
+  **relationship extraction + label merging** ("AWS" root vs "Amazon Web Services (AWS)" unplaced).
+
 ### Pick up here next time
-1. **Implement feature 002 (concept hierarchy)** — tasks ready in `specs/002-concept-hierarchy/tasks.md`
-   (MVP = US1, T001–T012). `/speckit-implement` or start at T001. T018 references 001's delete (now
-   done), so that dependency is cleared.
-2. **Finish feature 001 polish**: T046 (edge-case tests), T047 (README + Principle V caveat), T048
-   (harden LLM adapter messages), T049 (ruff/mypy sweep — currently clean), T050 (quickstart vs a live
-   model), T051 (release gate). T044/T045 already done.
-3. Optional measurable levers (now that the graph endpoints exist to inspect): extraction-noise
-   reduction (proper nouns / slide fragments) and recurrence-vs-degree reweighting.
+1. **Finish feature 002 polish:** T021/T022 (hierarchy eval scorer — structural faithfulness 100% +
+   coverage are deterministic/offline; roots-vs-curated-themes relevance needs dataset ground truth),
+   T025 (README section), T026/T027 (quickstart run + release gate).
+2. **Feature 001 polish:** T046–T051 (edge-case tests, README + Principle V caveat, adapter error
+   hardening, live-model quickstart, release gate). T044/T045 done.
+3. **Extraction tuning — now the highest-leverage quality work:** the hierarchy exposed that
+   *relationship* recall + label merging cap the tree's richness (half the lecture concepts are
+   edge-less). Measurable against the harness; re-run `--live` sparingly (DeepSeek credit).
 
 ---
 

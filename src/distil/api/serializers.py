@@ -10,6 +10,7 @@ from collections.abc import Sequence
 from typing import Any
 
 from distil.domain.concept import Concept
+from distil.domain.hierarchy import ConceptHierarchy, HierarchyNode
 from distil.domain.material import Material
 from distil.domain.ranking import RankingRun, VitalFewEntry
 from distil.domain.relationship import Relationship
@@ -83,6 +84,77 @@ def graph_view(
         "nodes": [graph_node(c) for c in concepts],
         "edges": [graph_edge(r) for r in relationships],
     }
+
+
+def _node_signals(concept: Concept | None) -> dict[str, Any]:
+    """The graph signals shown on a hierarchy node (empty-safe if the concept is missing)."""
+    centrality = (concept.centrality or {}) if concept is not None else {}
+    return {
+        "pagerank": centrality.get("pagerank"),
+        "degree": centrality.get("degree"),
+        "recurrence": concept.recurrence_count if concept is not None else None,
+    }
+
+
+def hierarchy_node_view(
+    node: HierarchyNode,
+    hierarchy: ConceptHierarchy,
+    concepts_by_id: dict[str, Concept],
+) -> dict[str, Any]:
+    """One hierarchy node with its signals, grounded placement, and nested children (recursive).
+
+    Every non-root node carries a non-empty ``placement.grounding`` — the faithfulness guarantee.
+    """
+    concept = concepts_by_id.get(node.concept_id)
+    return {
+        "concept": {
+            "id": node.concept_id,
+            "label": concept.label if concept is not None else node.concept_id,
+        },
+        "is_pillar": node.is_pillar,
+        "depth": node.depth,
+        "signals": _node_signals(concept),
+        "placement": {
+            "reason": node.placement_reason,
+            "grounding_edge_id": node.grounding_edge_id,
+            "grounding": [source_ref(s) for s in node.grounding],
+        },
+        "children": [
+            hierarchy_node_view(hierarchy.nodes[child_id], hierarchy, concepts_by_id)
+            for child_id in node.children
+            if child_id in hierarchy.nodes
+        ],
+    }
+
+
+def hierarchy_view(
+    hierarchy: ConceptHierarchy, concepts_by_id: dict[str, Concept]
+) -> dict[str, Any]:
+    """GET /hierarchy: the forest (roots → children) plus any edge-less ``unplaced`` concepts.
+
+    When ``roots`` is empty (corpus too small to form a hierarchy) an explanatory ``note`` is added.
+    """
+    body: dict[str, Any] = {
+        "workspace_id": hierarchy.workspace_id,
+        "total_concepts": hierarchy.total_concepts,
+        "roots": [
+            hierarchy_node_view(hierarchy.nodes[root_id], hierarchy, concepts_by_id)
+            for root_id in hierarchy.roots
+        ],
+        "unplaced": [
+            {
+                "id": cid,
+                "label": concepts_by_id[cid].label if cid in concepts_by_id else cid,
+            }
+            for cid in hierarchy.unplaced
+        ],
+    }
+    if not hierarchy.roots:
+        body["note"] = (
+            "Not enough material yet to form a concept hierarchy. Add more notes and the tree will "
+            "appear once there are enough connected concepts to organise."
+        )
+    return body
 
 
 def vital_few_view(

@@ -9,7 +9,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 
 from distil.api.errors import register_exception_handlers
-from distil.api.routers import graph, materials, vital_few
+from distil.api.routers import graph, hierarchy, materials, vital_few
 from distil.logging_setup import configure_logging
 
 
@@ -32,6 +32,7 @@ def create_app() -> FastAPI:
     app.include_router(materials.router)
     app.include_router(vital_few.router)
     app.include_router(graph.router)
+    app.include_router(hierarchy.router)
     return app
 
 
