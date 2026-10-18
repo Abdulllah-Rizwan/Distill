@@ -147,11 +147,6 @@ in `decisions.md`; this file tracks *activity and todos* only.
 - **T051 release gate:** **126 tests green**, eval OVERALL PASS (faithfulness 100%, hierarchy structure
   100%), ruff + format + mypy clean, no unresolved constitution violations.
 
-### State of the repo
-- **Feature 001 (concept graph + 80/20): COMPLETE** — all 51 tasks done (US1–US3 + polish + gate).
-- **Feature 002 (concept hierarchy): COMPLETE** (US1–US3 + evals + docs + gate).
-- Everything green and pushed to GitHub `main`.
-
 ### Done today (cont.) — extraction tuning #1: acronym/expansion concept merge (DS-0005)
 - **Grounded the work in data** (read-only analysis of the 211-concept lecture graph): **49%
   edge-less** (relationship recall = the big lever, separate), **0** punctuation/casing collisions,
@@ -163,24 +158,42 @@ in `decisions.md`; this file tracks *activity and todos* only.
   unchanged (no acronyms → no regression). Expected lecture effect: the 4 core pairs consolidate
   (higher recurrence/centrality, no duplicated pillars).
 
-### Pick up here next time
-1. **Relationship-recall prompt tuning — the biggest remaining lever** (49% of lecture concepts are
-   edge-less). This is an extraction-prompt change in `adapters/llm/prompts.py`, so it needs a **live
-   DeepSeek re-run on the lectures** to measure the edge-less rate before/after (energy-cycle is
-   already well-connected and won't show it). Consider adding an "orphan rate" metric to the eval
-   report. Keep faithfulness 100% (every relationship still needs a verbatim quote). Budget the credit.
-2. Optional: broader (non-acronym) synonym merging once a merge-quality eval metric exists;
-   recurrence-vs-degree ranking-weight tuning; a thin TS frontend over the API.
+### End-of-day state (2026-10-18)
+A big day — one wall (Gemini quota) turned into a provider swap, then both features landed end-to-end
+plus the first extraction-tuning increment. Headlines:
+- **DS-0002 DeepSeek provider** added behind the `JsonLLM` port (Gemini quota exhausted; `LLM_PROVIDER`
+  switch, default gemini). First live DeepSeek call faithful.
+- **First eval baseline recorded** (energy-cycle, DeepSeek) and reproducible on replay; recording it
+  exposed + fixed two pipeline defects — **DS-0003** (deterministic ids + memoized extraction) and the
+  vital-few sizing **DS-0004** (fixed ~5, not a %); relevance 0.60→1.00, faithfulness 100%.
+- **Feature 001 (concept graph + 80/20): COMPLETE** — all 51 tasks (US1 MVP + US2 graph endpoints +
+  US3 delete/rebuild + polish incl. T048 LLM-failure → 503 + release gate).
+- **Feature 002 (concept hierarchy): COMPLETE** — spec→plan→tasks→impl→evals→docs→gate (27 tasks); a
+  faithful BFS forest over the graph, roots = vital-few pillars, structural-faithfulness eval gate.
+- **Extraction tuning #1 (DS-0005):** acronym↔expansion concept merge (IaaS/PaaS/SaaS/AWS).
+- **127 tests green**; ruff + format + mypy clean; eval OVERALL PASS; all pushed to GitHub `main`
+  (latest `664088e`). Working tree clean.
 
-### Pick up here next time
-1. **Extraction tuning — the highest-leverage quality work now.** The hierarchy made it visceral:
-   ~half the lecture concepts are edge-less (`unplaced`) because *relationship* extraction is sparse,
-   and label merging misses variants ("AWS" vs "Amazon Web Services (AWS)"). Both are measurable
-   against the harness; budget `--live` DeepSeek re-records. Decide concept identity (exact vs
-   normalised/fuzzy) → a `decisions.md` entry.
-2. **Feature 001 polish:** T046–T051 (edge-case tests, README Principle V caveat — partly done, adapter
-   error hardening, live-model quickstart, final release gate).
-3. Optional: recurrence-vs-degree reweighting of the ranking signals (eval-tunable).
+### Pick up here tomorrow
+1. **Relationship-recall prompt tuning — the biggest remaining quality lever.** The data: **49% of the
+   211 lecture concepts are edge-less**, because the extractor pulls few relationships, which caps the
+   hierarchy's richness. Plan:
+   - *(zero-quota prep first)* add an **"orphan rate" (edge-less %) metric** to the eval report so the
+     change is measurable; optionally draft the prompt revision.
+   - Revise the relationship ask in `src/distil/adapters/llm/prompts.py` (`EXTRACTION_SYSTEM_INSTRUCTION`)
+     to elicit more relationships — every one still needs a **verbatim quote** (faithfulness stays 100%).
+   - Measure with **one live DeepSeek re-run on the lectures** (energy-cycle is already well-connected,
+     so it won't show the gain) — compare edge-less % before/after. Budget the DeepSeek credit; iterate.
+   - A read-only lecture scratch DB from today lives in the session scratchpad (`lectures.db`) — may be
+     gone tomorrow; re-run the 5 PDFs live to regenerate if needed.
+2. Optional: broader (non-acronym) synonym merging once a merge-quality eval metric exists;
+   recurrence-vs-degree ranking-weight tuning; a thin TypeScript frontend over the API.
+
+### Open questions
+- Concept identity beyond acronyms (DS-0005): is fuzzy/synonym merging worth the non-determinism? Needs
+  a merge-quality eval metric before deciding.
+- Is the 80/20 pitched at revisited-topic corpora vs. sequential lectures? (recurrence still sparse on
+  the disjoint Cloud lectures) — revisit recurrence-vs-centrality weighting via evals.
 
 ---
 
