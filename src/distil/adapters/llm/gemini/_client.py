@@ -14,7 +14,7 @@ from google import genai
 from google.genai import errors, types
 from pydantic import BaseModel
 
-from distil.adapters.llm.base import with_retries
+from distil.adapters.llm.base import LlmUnavailableError, with_retries
 
 # HTTP status codes worth retrying: 429 (rate limited — expected on the free tier) and the transient
 # 5xx family (model briefly overloaded or unavailable). A 400/401/403 is our bug or a bad key and is
@@ -25,6 +25,15 @@ _RETRYABLE_CODES = frozenset({429, 500, 502, 503, 504})
 def is_retryable(exc: BaseException) -> bool:
     """Classify a google-genai error as a transient one worth retrying."""
     return isinstance(exc, errors.APIError) and exc.code in _RETRYABLE_CODES
+
+
+def _unavailable_message(exc: errors.APIError) -> str:
+    """A plain, user-facing reason for a Gemini failure (no SDK internals)."""
+    if exc.code == 429:
+        return "The language model is over its rate limit or quota right now. Try again later."
+    if exc.code in {401, 403}:
+        return "The language model rejected the request credentials. Check the configured API key."
+    return f"The language model is temporarily unavailable (Gemini error {exc.code}). Try again."
 
 
 class GeminiClient:
@@ -80,10 +89,14 @@ class GeminiClient:
             )
             return response.text or ""
 
-        return with_retries(
-            _call,
-            is_retryable=is_retryable,
-            max_retries=self._max_retries,
-            base_delay=self._base_delay,
-            sleep=self._sleep,
-        )
+        try:
+            return with_retries(
+                _call,
+                is_retryable=is_retryable,
+                max_retries=self._max_retries,
+                base_delay=self._base_delay,
+                sleep=self._sleep,
+            )
+        except errors.APIError as exc:
+            # Retries are exhausted or the error is non-recoverable: surface a clean message.
+            raise LlmUnavailableError(_unavailable_message(exc)) from exc

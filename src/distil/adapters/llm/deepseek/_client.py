@@ -25,7 +25,7 @@ from collections.abc import Callable
 import httpx
 from pydantic import BaseModel
 
-from distil.adapters.llm.base import with_retries
+from distil.adapters.llm.base import LlmUnavailableError, with_retries
 
 _RETRYABLE_STATUS = frozenset({429, 500, 502, 503, 504})
 _DEFAULT_BASE_URL = "https://api.deepseek.com"
@@ -36,6 +36,20 @@ def is_retryable(exc: BaseException) -> bool:
     if isinstance(exc, httpx.HTTPStatusError):
         return exc.response.status_code in _RETRYABLE_STATUS
     return isinstance(exc, httpx.TransportError)
+
+
+def _unavailable_message(exc: httpx.HTTPError) -> str:
+    """A plain, user-facing reason for a DeepSeek failure (no SDK/HTTP internals)."""
+    if isinstance(exc, httpx.HTTPStatusError):
+        code = exc.response.status_code
+        if code == 429:
+            return "The language model is over its rate limit right now. Try again later."
+        if code == 402:
+            return "The language model account is out of credit. Top up the DeepSeek balance."
+        if code in {401, 403}:
+            return "The language model rejected the request credentials. Check the configured key."
+        return f"The language model is temporarily unavailable (DeepSeek HTTP {code}). Try again."
+    return "The language model could not be reached (connection or timeout). Try again."
 
 
 def _extract_content(data: object) -> str:
@@ -117,10 +131,14 @@ class DeepSeekClient:
             response.raise_for_status()
             return _extract_content(response.json())
 
-        return with_retries(
-            _call,
-            is_retryable=is_retryable,
-            max_retries=self._max_retries,
-            base_delay=self._base_delay,
-            sleep=self._sleep,
-        )
+        try:
+            return with_retries(
+                _call,
+                is_retryable=is_retryable,
+                max_retries=self._max_retries,
+                base_delay=self._base_delay,
+                sleep=self._sleep,
+            )
+        except httpx.HTTPError as exc:
+            # Retries are exhausted or the error is non-recoverable: surface a clean message.
+            raise LlmUnavailableError(_unavailable_message(exc)) from exc

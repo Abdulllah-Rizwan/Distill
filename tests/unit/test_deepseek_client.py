@@ -13,6 +13,7 @@ import httpx
 import pytest
 from pydantic import BaseModel
 
+from distil.adapters.llm.base import LlmUnavailableError
 from distil.adapters.llm.deepseek import build_deepseek_provider
 from distil.adapters.llm.deepseek._client import DeepSeekClient, is_retryable
 from distil.adapters.llm.explainer import JsonExplainer
@@ -94,11 +95,11 @@ def test_generate_json_does_not_retry_on_402_out_of_credit() -> None:
         attempts["n"] += 1
         return httpx.Response(402, json={"error": {"message": "Insufficient Balance"}})
 
-    with pytest.raises(httpx.HTTPStatusError):
+    with pytest.raises(LlmUnavailableError, match="out of credit"):
         _client(httpx.MockTransport(handler)).generate_json(
             system_instruction="s", user_content="u", response_schema=_Schema
         )
-    assert attempts["n"] == 1  # 402 propagates immediately, no retry loop
+    assert attempts["n"] == 1  # 402 not retried; surfaced as a clean LlmUnavailableError
 
 
 def test_generate_json_returns_empty_on_missing_choices() -> None:

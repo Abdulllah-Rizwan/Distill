@@ -9,6 +9,7 @@ from __future__ import annotations
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from distil.adapters.llm.base import LlmUnavailableError
 from distil.domain.errors import DomainError, UnsupportedContentError
 
 
@@ -28,7 +29,13 @@ async def _handle_domain_error(_: Request, exc: DomainError) -> JSONResponse:
     return error_response(400, "domain_error", str(exc))
 
 
+async def _handle_llm_unavailable(_: Request, exc: LlmUnavailableError) -> JSONResponse:
+    # The LLM provider failed (rate limit, out of credit, timeout, outage): fail cleanly, not 500.
+    return error_response(503, "llm_unavailable", str(exc))
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     """Register domain exception handlers on the app (most specific first)."""
     app.add_exception_handler(UnsupportedContentError, _handle_unsupported)  # type: ignore[arg-type]
     app.add_exception_handler(DomainError, _handle_domain_error)  # type: ignore[arg-type]
+    app.add_exception_handler(LlmUnavailableError, _handle_llm_unavailable)  # type: ignore[arg-type]

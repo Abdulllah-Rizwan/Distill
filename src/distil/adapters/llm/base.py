@@ -16,6 +16,15 @@ from typing import Protocol
 from pydantic import BaseModel
 
 
+class LlmUnavailableError(Exception):
+    """The LLM provider could not be reached, or returned an error retries could not recover.
+
+    Carries a plain, user-facing message (no stack traces or provider internals). The API maps it to
+    a 503 so an upload fails cleanly with a clear reason — rate limit, out of credit, timeout, or a
+    provider outage — instead of surfacing a raw SDK/HTTP exception as an opaque 500.
+    """
+
+
 class JsonLLM(Protocol):
     """The one capability the adapters need: send a prompt, get a JSON string back."""
 
