@@ -20,7 +20,7 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-from distil.adapters.llm.gemini._client import JsonLLM
+from distil.adapters.llm.base import JsonLLM
 
 
 def fixture_key(system_instruction: str, user_content: str, schema: type[BaseModel]) -> str:

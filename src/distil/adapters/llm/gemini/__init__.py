@@ -1,4 +1,4 @@
-"""Gemini LLM adapter: the production :class:`ConceptExtractor` and :class:`Explainer`.
+"""Gemini LLM provider: the provider-neutral adapters over a Gemini-backed :class:`JsonLLM`.
 
 One shared :class:`GeminiClient` backs both adapters so the API key, model id, and rate-limit
 backoff are configured once. :func:`build_gemini_provider` is the single entry point the composition
@@ -8,22 +8,20 @@ first real request.
 
 from __future__ import annotations
 
+from distil.adapters.llm.explainer import JsonExplainer
+from distil.adapters.llm.extractor import JsonConceptExtractor
 from distil.adapters.llm.gemini._client import GeminiClient
-from distil.adapters.llm.gemini.explainer import GeminiExplainer
-from distil.adapters.llm.gemini.extractor import GeminiConceptExtractor
 from distil.config import Settings
 from distil.ports.llm import ConceptExtractor, Explainer
 
 __all__ = [
     "GeminiClient",
-    "GeminiConceptExtractor",
-    "GeminiExplainer",
     "build_gemini_provider",
 ]
 
 
 def build_gemini_provider(settings: Settings) -> tuple[ConceptExtractor, Explainer]:
-    """Construct the Gemini-backed extractor and explainer over one shared client.
+    """Construct the extractor and explainer over one shared Gemini client.
 
     Raises :class:`ValueError` when ``GEMINI_API_KEY`` is unset, so a misconfigured deployment is
     caught at wiring time with a clear message (Principle V — secrets come from the environment and
@@ -35,4 +33,4 @@ def build_gemini_provider(settings: Settings) -> tuple[ConceptExtractor, Explain
             "before serving the API against the real model."
         )
     client = GeminiClient(api_key=settings.gemini_api_key, model=settings.gemini_model)
-    return GeminiConceptExtractor(client), GeminiExplainer(client)
+    return JsonConceptExtractor(client), JsonExplainer(client)

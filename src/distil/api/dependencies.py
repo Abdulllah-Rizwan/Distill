@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 
 from distil.adapters.graph.networkx.analyzer import NetworkxGraphAnalyzer
+from distil.adapters.llm.deepseek import build_deepseek_provider
 from distil.adapters.llm.gemini import build_gemini_provider
 from distil.adapters.parsing.pdf import PdfParser
 from distil.adapters.parsing.text import TextParser
@@ -58,12 +59,15 @@ def build_services(
 
 
 def build_llm_provider(settings: Settings) -> tuple[ConceptExtractor, Explainer]:
-    """Construct the real LLM adapters (Gemini) behind the LLM ports.
+    """Construct the real LLM adapters behind the LLM ports, per ``settings.llm_provider``.
 
-    Delegates to the Gemini adapter, which validates the API key and shares one client between the
+    Both providers share the same extractor/explainer code; only the underlying :class:`JsonLLM`
+    client differs. The chosen provider validates its own API key and shares one client between the
     extractor and explainer. Tests never reach this path — they inject deterministic fakes through
     ``app.dependency_overrides`` — so no test touches the network or the real model (Principle VII).
     """
+    if settings.llm_provider == "deepseek":
+        return build_deepseek_provider(settings)
     return build_gemini_provider(settings)
 
 

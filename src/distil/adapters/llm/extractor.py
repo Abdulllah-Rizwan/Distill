@@ -1,11 +1,12 @@
-"""Gemini-backed concept/relationship extraction (fills :class:`ConceptExtractor`, task T025).
+"""LLM-backed concept/relationship extraction (fills :class:`ConceptExtractor`, task T025).
 
-The model returns a verbatim quote for every concept and relationship; this adapter never trusts a
-character offset from the model. For each quote it finds the span in the material's own text and
-computes the offsets itself, so the resulting :class:`SourceReference` is faithful *by construction*
-— and the graph builder's provenance gate re-checks it anyway (Principle I, defence in depth). A
-quote the model altered or hallucinated simply will not be found, and that item is dropped: we
-prefer missing a real concept over inventing an ungrounded one.
+Provider-agnostic: it drives any backend behind the :class:`JsonLLM` port (Gemini, DeepSeek, or a
+test fake). The model returns a verbatim quote for every concept and relationship; this adapter
+never trusts a character offset from the model. For each quote it finds the span in the material's
+own text and computes the offsets itself, so the resulting :class:`SourceReference` is faithful *by
+construction* — and the graph builder's provenance gate re-checks it anyway (Principle I, defence
+in depth). A quote the model altered or hallucinated simply will not be found, and that item is
+dropped: we prefer missing a real concept over inventing an ungrounded one.
 
 Long materials are split into overlapping character windows so a single call stays within free-tier
 token limits; the window boundaries preserve absolute offsets, and the small overlap keeps a concept
@@ -19,8 +20,8 @@ from collections.abc import Iterator
 
 from pydantic import ValidationError
 
-from distil.adapters.llm.gemini._client import JsonLLM
-from distil.adapters.llm.gemini.prompts import (
+from distil.adapters.llm.base import JsonLLM
+from distil.adapters.llm.prompts import (
     EXTRACTION_SYSTEM_INSTRUCTION,
     ExtractionPayload,
     extraction_user_content,
@@ -30,8 +31,8 @@ from distil.domain.source_reference import SourceReference
 from distil.ports.llm import ConceptMention, ExtractionResult, RelationshipMention
 
 # Per-call text budget. A conservative default for the free tier; the eval/hardening pass tunes it
-# once the live tokens-per-minute limit is confirmed in AI Studio. The overlap is a safety margin so
-# a concept sitting on a window boundary is still seen whole in one of the two windows.
+# once the live tokens-per-minute limit is confirmed. The overlap is a safety margin so a concept
+# sitting on a window boundary is still seen whole in one of the two windows.
 DEFAULT_MAX_CHARS = 6000
 DEFAULT_OVERLAP_CHARS = 250
 
@@ -65,8 +66,8 @@ def iter_chunks(text: str, *, max_chars: int, overlap_chars: int) -> Iterator[tu
         start = max(end - overlap_chars, start + 1)
 
 
-class GeminiConceptExtractor:
-    """Extracts grounded mentions from a material using the Gemini model behind :class:`JsonLLM`."""
+class JsonConceptExtractor:
+    """Extracts grounded mentions from a material using any model behind :class:`JsonLLM`."""
 
     def __init__(
         self,

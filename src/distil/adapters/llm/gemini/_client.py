@@ -1,20 +1,20 @@
-"""Thin wrapper around the google-genai SDK: one JSON-in/JSON-out call with retry and backoff.
+"""Gemini-specific :class:`JsonLLM`: one JSON-in/JSON-out call via the google-genai SDK.
 
-Both adapters (extractor, explainer) talk to the model through :class:`GeminiClient`, so the model
-id, sampling settings, structured-output plumbing, and the free-tier rate-limit backoff live in one
-place. The adapters depend on the narrow :class:`JsonLLM` protocol, which lets tests inject a
-deterministic fake and never touch the network (Principle VII — fast, free, offline tests).
+The provider-neutral pieces (the :class:`JsonLLM` protocol and the retry/backoff policy) live in
+:mod:`distil.adapters.llm.base`; this module holds only what is Gemini-specific — the SDK call,
+structured-output plumbing, sampling settings, and which of the SDK's errors are worth retrying.
 """
 
 from __future__ import annotations
 
 import time
 from collections.abc import Callable
-from typing import Protocol
 
 from google import genai
 from google.genai import errors, types
 from pydantic import BaseModel
+
+from distil.adapters.llm.base import with_retries
 
 # HTTP status codes worth retrying: 429 (rate limited — expected on the free tier) and the transient
 # 5xx family (model briefly overloaded or unavailable). A 400/401/403 is our bug or a bad key and is
@@ -22,38 +22,9 @@ from pydantic import BaseModel
 _RETRYABLE_CODES = frozenset({429, 500, 502, 503, 504})
 
 
-class JsonLLM(Protocol):
-    """The one capability the adapters need: send a prompt, get a JSON string back."""
-
-    def generate_json(
-        self, *, system_instruction: str, user_content: str, response_schema: type[BaseModel]
-    ) -> str:
-        """Return the model's response as a JSON string constrained to ``response_schema``."""
-        ...
-
-
-def with_retries[T](
-    call: Callable[[], T],
-    *,
-    max_retries: int,
-    base_delay: float,
-    sleep: Callable[[float], None] = time.sleep,
-) -> T:
-    """Run ``call``, retrying on retryable API errors with exponential backoff.
-
-    Separated from the SDK call so the backoff policy can be unit-tested with a fake ``call`` and a
-    no-op ``sleep`` — no network, no real waiting. Non-retryable errors propagate immediately; a
-    retryable error past ``max_retries`` is re-raised so the caller still sees a real failure.
-    """
-    attempt = 0
-    while True:
-        try:
-            return call()
-        except errors.APIError as exc:
-            if exc.code not in _RETRYABLE_CODES or attempt >= max_retries:
-                raise
-            sleep(base_delay * (2**attempt))
-            attempt += 1
+def is_retryable(exc: BaseException) -> bool:
+    """Classify a google-genai error as a transient one worth retrying."""
+    return isinstance(exc, errors.APIError) and exc.code in _RETRYABLE_CODES
 
 
 class GeminiClient:
@@ -110,5 +81,9 @@ class GeminiClient:
             return response.text or ""
 
         return with_retries(
-            _call, max_retries=self._max_retries, base_delay=self._base_delay, sleep=self._sleep
+            _call,
+            is_retryable=is_retryable,
+            max_retries=self._max_retries,
+            base_delay=self._base_delay,
+            sleep=self._sleep,
         )

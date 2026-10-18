@@ -1,9 +1,10 @@
-"""Unit tests for the Gemini adapter (T025/T028), fully offline.
+"""Unit tests for the provider-neutral LLM adapters and shared retry policy, fully offline.
 
-A scripted fake stands in for :class:`~distil.adapters.llm.gemini._client.JsonLLM`, so these tests
-exercise the real quote-locating, offset math, chunking, schema parsing, retry/backoff policy, and
-wiring guard without a network call or an API key. The guarantee under test is Principle I: every
-reference the adapter emits is faithful to the source, and anything the model alters is dropped.
+A scripted fake stands in for :class:`~distil.adapters.llm.base.JsonLLM`, so these exercise the real
+quote-locating, offset math, chunking, and schema parsing without a network call or an API key — the
+same extractor/explainer code runs behind every provider. The guarantee under test is Principle I:
+every reference the adapter emits is faithful to the source, and anything the model alters is
+dropped. The retry/backoff policy is tested here too, with an injected predicate and a no-op sleep.
 """
 
 from __future__ import annotations
@@ -15,11 +16,12 @@ import pytest
 from google.genai import errors
 from pydantic import BaseModel
 
+from distil.adapters.llm.base import with_retries
+from distil.adapters.llm.explainer import JsonExplainer
+from distil.adapters.llm.extractor import JsonConceptExtractor, iter_chunks
+from distil.adapters.llm.gemini import _client as gemini_client
 from distil.adapters.llm.gemini import build_gemini_provider
-from distil.adapters.llm.gemini._client import with_retries
-from distil.adapters.llm.gemini.explainer import GeminiExplainer
-from distil.adapters.llm.gemini.extractor import GeminiConceptExtractor, iter_chunks
-from distil.adapters.llm.gemini.prompts import (
+from distil.adapters.llm.prompts import (
     ExplanationPayload,
     ExtractedConcept,
     ExtractedRelationship,
@@ -81,7 +83,7 @@ def test_extractor_grounds_quotes_and_drops_unfound() -> None:
             ],
         ).model_dump_json()
 
-    result = GeminiConceptExtractor(_ScriptedLLM(responder)).extract(_material(content))
+    result = JsonConceptExtractor(_ScriptedLLM(responder)).extract(_material(content))
 
     assert {c.label for c in result.concepts} == {"Photosynthesis", "Chlorophyll"}
     for mention in result.concepts:
@@ -108,7 +110,7 @@ def test_extractor_computes_absolute_offsets_across_chunks() -> None:
         )
         return ExtractionPayload(concepts=concepts).model_dump_json()
 
-    extractor = GeminiConceptExtractor(_ScriptedLLM(responder), max_chars=50, overlap_chars=10)
+    extractor = JsonConceptExtractor(_ScriptedLLM(responder), max_chars=50, overlap_chars=10)
     result = extractor.extract(_material(content))
 
     assert {c.label for c in result.concepts} == {"Osmosis"}
@@ -119,7 +121,7 @@ def test_extractor_computes_absolute_offsets_across_chunks() -> None:
 
 
 def test_extractor_skips_malformed_response() -> None:
-    extractor = GeminiConceptExtractor(_ScriptedLLM(lambda _s, _c: "this is not json"))
+    extractor = JsonConceptExtractor(_ScriptedLLM(lambda _s, _c: "this is not json"))
     result = extractor.extract(_material("Some notes about gravity."))
     assert result.concepts == ()
     assert result.relationships == ()
@@ -163,7 +165,7 @@ def test_explainer_maps_ids_to_sentences_and_drops_empty() -> None:
         ).model_dump_json()
 
     client = _ScriptedLLM(responder)
-    out = GeminiExplainer(client).explain([_request("c1", "alpha", 1), _request("c2", "beta", 2)])
+    out = JsonExplainer(client).explain([_request("c1", "alpha", 1), _request("c2", "beta", 2)])
 
     assert out == {"c1": "Alpha ties beta and gamma together."}
     assert len(client.calls) == 1  # single batched call
@@ -171,16 +173,27 @@ def test_explainer_maps_ids_to_sentences_and_drops_empty() -> None:
 
 def test_explainer_no_requests_makes_no_call() -> None:
     client = _ScriptedLLM(lambda _s, _c: pytest.fail("should not call the model"))
-    assert GeminiExplainer(client).explain([]) == {}
+    assert JsonExplainer(client).explain([]) == {}
     assert client.calls == []
 
 
 def test_explainer_malformed_returns_empty() -> None:
-    explainer = GeminiExplainer(_ScriptedLLM(lambda _s, _c: "{not valid"))
+    explainer = JsonExplainer(_ScriptedLLM(lambda _s, _c: "{not valid"))
     assert explainer.explain([_request("c1", "alpha", 1)]) == {}
 
 
-# --- Retry / backoff policy --------------------------------------------------------------------
+# --- Shared retry / backoff policy -------------------------------------------------------------
+
+
+class _BoomError(Exception):
+    """A test error carrying a retryable flag, to drive the backoff predicate."""
+
+    def __init__(self, *, retryable: bool) -> None:
+        self.retryable = retryable
+
+
+def _is_boom_retryable(exc: BaseException) -> bool:
+    return isinstance(exc, _BoomError) and exc.retryable
 
 
 def test_with_retries_backs_off_then_succeeds() -> None:
@@ -190,10 +203,12 @@ def test_with_retries_backs_off_then_succeeds() -> None:
     def call() -> str:
         attempts["n"] += 1
         if attempts["n"] < 3:
-            raise errors.ClientError(429, {"error": {"message": "rate limited", "code": 429}})
+            raise _BoomError(retryable=True)
         return "ok"
 
-    result = with_retries(call, max_retries=4, base_delay=2.0, sleep=sleeps.append)
+    result = with_retries(
+        call, is_retryable=_is_boom_retryable, max_retries=4, base_delay=2.0, sleep=sleeps.append
+    )
     assert result == "ok"
     assert attempts["n"] == 3
     assert sleeps == [2.0, 4.0]  # exponential: base * 2**0, base * 2**1
@@ -203,10 +218,16 @@ def test_with_retries_reraises_non_retryable_immediately() -> None:
     sleeps: list[float] = []
 
     def call() -> str:
-        raise errors.ClientError(400, {"error": {"message": "bad request", "code": 400}})
+        raise _BoomError(retryable=False)
 
-    with pytest.raises(errors.ClientError):
-        with_retries(call, max_retries=4, base_delay=1.0, sleep=sleeps.append)
+    with pytest.raises(_BoomError):
+        with_retries(
+            call,
+            is_retryable=_is_boom_retryable,
+            max_retries=4,
+            base_delay=1.0,
+            sleep=sleeps.append,
+        )
     assert sleeps == []
 
 
@@ -214,11 +235,24 @@ def test_with_retries_gives_up_after_max() -> None:
     sleeps: list[float] = []
 
     def call() -> str:
-        raise errors.ServerError(503, {"error": {"message": "overloaded", "code": 503}})
+        raise _BoomError(retryable=True)
 
-    with pytest.raises(errors.ServerError):
-        with_retries(call, max_retries=2, base_delay=1.0, sleep=sleeps.append)
+    with pytest.raises(_BoomError):
+        with_retries(
+            call,
+            is_retryable=_is_boom_retryable,
+            max_retries=2,
+            base_delay=1.0,
+            sleep=sleeps.append,
+        )
     assert len(sleeps) == 2  # two retries, then the third failure propagates
+
+
+def test_gemini_is_retryable_classifies_status_codes() -> None:
+    assert gemini_client.is_retryable(errors.ClientError(429, {"error": {"code": 429}}))
+    assert gemini_client.is_retryable(errors.ServerError(503, {"error": {"code": 503}}))
+    assert not gemini_client.is_retryable(errors.ClientError(400, {"error": {"code": 400}}))
+    assert not gemini_client.is_retryable(ValueError("unrelated"))
 
 
 # --- Wiring guard ------------------------------------------------------------------------------
@@ -231,5 +265,5 @@ def test_build_gemini_provider_requires_api_key() -> None:
 
 def test_build_gemini_provider_returns_both_adapters() -> None:
     extractor, explainer = build_gemini_provider(Settings(gemini_api_key="test-key"))
-    assert isinstance(extractor, GeminiConceptExtractor)
-    assert isinstance(explainer, GeminiExplainer)
+    assert isinstance(extractor, JsonConceptExtractor)
+    assert isinstance(explainer, JsonExplainer)

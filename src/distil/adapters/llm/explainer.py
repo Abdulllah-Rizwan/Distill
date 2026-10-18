@@ -1,11 +1,12 @@
-"""Gemini-backed rationale writing (fills :class:`Explainer`, task T028).
+"""LLM-backed rationale writing (fills :class:`Explainer`, task T028).
 
-The ranking service has already chosen and ordered the vital-few concepts and computed their
-signals; this adapter only writes the human-readable "why". It is handed the rank, the signals, the
-neighbour labels, and verbatim source quotes, and returns one sentence per concept in a single
-batched call. It cannot change rank or signals — those never round-trip through the model — so the
-explanation can never silently contradict the ranking (Principle II). A concept the model omits is
-filled with a deterministic fallback sentence by the service, so the view is always complete.
+Provider-agnostic: it drives any backend behind the :class:`JsonLLM` port. The ranking service has
+already chosen and ordered the vital-few concepts and computed their signals; this adapter only
+writes the human-readable "why". It is handed the rank, the signals, the neighbour labels, and
+verbatim source quotes, and returns one sentence per concept in a single batched call. It cannot
+change rank or signals — those never round-trip through the model — so the explanation can never
+silently contradict the ranking (Principle II). A concept the model omits is filled with a
+deterministic fallback sentence by the service, so the view is always complete.
 """
 
 from __future__ import annotations
@@ -15,8 +16,8 @@ from collections.abc import Sequence
 
 from pydantic import ValidationError
 
-from distil.adapters.llm.gemini._client import JsonLLM
-from distil.adapters.llm.gemini.prompts import (
+from distil.adapters.llm.base import JsonLLM
+from distil.adapters.llm.prompts import (
     EXPLANATION_SYSTEM_INSTRUCTION,
     ExplanationPayload,
 )
@@ -35,8 +36,8 @@ def _request_payload(request: ExplanationRequest) -> dict[str, object]:
     }
 
 
-class GeminiExplainer:
-    """Writes the vital-few rationales using the Gemini model behind :class:`JsonLLM`."""
+class JsonExplainer:
+    """Writes the vital-few rationales using any model behind :class:`JsonLLM`."""
 
     def __init__(self, client: JsonLLM) -> None:
         self._client = client

@@ -9,9 +9,12 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+LlmProvider = Literal["gemini", "deepseek"]
 
 
 class Settings(BaseSettings):
@@ -28,7 +31,16 @@ class Settings(BaseSettings):
         case_sensitive=False,
     )
 
-    # LLM provider (Gemini free tier for the MVP; swappable behind the LLM provider port).
+    # Which LLM backend fills the extractor/explainer ports. Both satisfy the same JsonLLM port, so
+    # this is the only switch; each provider's own credentials are read below. Default stays the
+    # planned Gemini free tier (see plan.md); set LLM_PROVIDER=deepseek in .env to use DeepSeek
+    # (decision-shift DS-0002 — e.g. while the Gemini free-tier daily quota is exhausted).
+    llm_provider: LlmProvider = Field(
+        default="gemini",
+        description="LLM backend behind the extractor/explainer ports: 'gemini' or 'deepseek'.",
+    )
+
+    # LLM provider: Gemini (free tier for the MVP; swappable behind the LLM provider port).
     gemini_api_key: str = Field(
         default="",
         description="Google Gemini API key. Required for real LLM calls; left empty keeps imports "
@@ -38,6 +50,22 @@ class Settings(BaseSettings):
         default="gemini-3-flash-preview",
         description="Gemini model id. The planned 'gemini-3-flash' does not exist on the API; "
         "'gemini-3-flash-preview' is the Gemini 3 Flash id this key can call (see decisions.md).",
+    )
+
+    # LLM provider: DeepSeek (OpenAI-compatible API; used when llm_provider == 'deepseek').
+    deepseek_api_key: str = Field(
+        default="",
+        description="DeepSeek API key. Required only when LLM_PROVIDER=deepseek; the DeepSeek "
+        "adapter checks it is set before use.",
+    )
+    deepseek_model: str = Field(
+        default="deepseek-chat",
+        description="DeepSeek model id. 'deepseek-chat' (DeepSeek-V3, non-reasoning) suits our "
+        "mechanical extract/explain asks; 'deepseek-reasoner' is available but unnecessary.",
+    )
+    deepseek_base_url: str = Field(
+        default="https://api.deepseek.com",
+        description="Base URL for the DeepSeek OpenAI-compatible API.",
     )
 
     # Local persistence (SQLite source of truth for v1).

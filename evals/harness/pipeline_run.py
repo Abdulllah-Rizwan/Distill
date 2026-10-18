@@ -1,18 +1,18 @@
 """Run the real ingestion -> graph -> ranking pipeline for a dataset behind a given LLM.
 
 Uses the production composition root (:func:`build_services`) over an in-memory SQLite database,
-with the Gemini extractor/explainer pointed at whatever :class:`JsonLLM` the caller supplies
-(recording, replay, or the real client). So the eval exercises the same code the API does — only
-the model I/O is swapped at the port.
+with the extractor/explainer pointed at whatever :class:`JsonLLM` the caller supplies (recording,
+replay, or the real client). So the eval exercises the same code the API does — only the model I/O
+is swapped at the port.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
-from distil.adapters.llm.gemini._client import JsonLLM
-from distil.adapters.llm.gemini.explainer import GeminiExplainer
-from distil.adapters.llm.gemini.extractor import GeminiConceptExtractor
+from distil.adapters.llm.base import JsonLLM
+from distil.adapters.llm.explainer import JsonExplainer
+from distil.adapters.llm.extractor import JsonConceptExtractor
 from distil.adapters.persistence.sqlite.schema import connect, initialize
 from distil.api.dependencies import build_services
 from distil.domain.concept import Concept
@@ -49,7 +49,7 @@ def run_pipeline(dataset: Dataset, llm: JsonLLM) -> PipelineOutput:
     """Ingest every note in ``dataset`` and return the resulting graph + vital-few."""
     conn = connect(":memory:")
     initialize(conn)
-    services = build_services(conn, GeminiConceptExtractor(llm), GeminiExplainer(llm))
+    services = build_services(conn, JsonConceptExtractor(llm), JsonExplainer(llm))
     for note in dataset.notes:
         services.pipeline.ingest(WORKSPACE, note.filename, note.text.encode("utf-8"))
 

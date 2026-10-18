@@ -15,7 +15,7 @@ from dataclasses import dataclass
 
 from pydantic import BaseModel, Field
 
-from distil.adapters.llm.gemini._client import JsonLLM
+from distil.adapters.llm.base import JsonLLM
 from evals.harness.dataset import Dataset
 
 JUDGE_SYSTEM_INSTRUCTION = """\

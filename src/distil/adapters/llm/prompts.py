@@ -1,4 +1,4 @@
-"""Prompts and structured-output schemas for the Gemini adapter — the contract with the model.
+"""Prompts and structured-output schemas for the LLM adapters — the contract with the model.
 
 These live in source (not a config file or a notebook) on purpose: the exact words we send the model
 are part of the system's behaviour and must be reviewable, diffable, and testable like any other
@@ -14,9 +14,9 @@ code (Principle VII — verified reliability). Two deliberately narrow asks, mir
   one honest sentence each. It is handed the numbers; it cannot recompute or reorder them
   (Principle II — explainable, not black-box).
 
-The Pydantic models below are passed to Gemini as ``response_schema`` so the model is constrained to
-return exactly this shape (structured output), and we validate the response against them again on
-our side before trusting a single field.
+The Pydantic models below shape the response: a provider with native structured output receives them
+as its ``response_schema``; one with only JSON mode (DeepSeek) is handed the same schema in the
+prompt. Either way we validate the response against them again on our side before trusting a field.
 """
 
 from __future__ import annotations
