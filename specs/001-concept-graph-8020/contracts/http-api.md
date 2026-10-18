@@ -16,6 +16,9 @@ auth; a `workspace_id` is carried explicitly to keep the isolation seam real (Pr
 ```json
 { "error": { "code": "unsupported_format", "message": "Human-readable reason." } }
 ```
+When the LLM provider fails (rate limit, out of credit, timeout, or outage) and retries cannot
+recover, write endpoints return **`503`** with `code: "llm_unavailable"` and a plain message, rather
+than a raw provider exception as a 500 (T048).
 
 **Shared shape — SourceReference**:
 ```json

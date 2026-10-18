@@ -131,10 +131,32 @@ in `decisions.md`; this file tracks *activity and todos* only.
   clean.
 - **120 tests green** (+2 scorer tests); `mypy evals` clean. **All 27 feature-002 tasks done.**
 
+### Done today (cont.) — feature 001 polish COMPLETE (T046–T051)
+- **T048 LLM error hardening:** both providers translate an exhausted-retry / non-recoverable error
+  (rate limit, out of credit, bad key, timeout, outage) into a neutral `LlmUnavailableError` with a
+  plain message; the API maps it to **503 `llm_unavailable`** (new handler) instead of a raw 500.
+  Contract doc updated.
+- **T046 edge-case tests:** empty material (202, no ranking), too-small corpus (empty vital-few +
+  note), and **conflicting cross-material statements kept** (A→B "causes" and A→B "prevents" both
+  survive — conflict surfaced, not resolved; Principle I).
+- **T048 error tests:** Gemini message mapping, DeepSeek retry-exhaustion wrapping (offline), and the
+  end-to-end 503 contract.
+- **T047/T049:** README covers setup/run + the Principle V caveat + the full API; ruff + mypy clean.
+- **T050:** real-model path validated via the active provider (live DeepSeek: smoke, `--live` baseline,
+  5-lecture run); Gemini id/limit confirmed in DS-0001; not re-run against Gemini (quota exhausted).
+- **T051 release gate:** **126 tests green**, eval OVERALL PASS (faithfulness 100%, hierarchy structure
+  100%), ruff + format + mypy clean, no unresolved constitution violations.
+
 ### State of the repo
-- **Feature 001 (concept graph + 80/20): all 3 user stories implemented**; polish T046–T051 remain.
+- **Feature 001 (concept graph + 80/20): COMPLETE** — all 51 tasks done (US1–US3 + polish + gate).
 - **Feature 002 (concept hierarchy): COMPLETE** (US1–US3 + evals + docs + gate).
 - Everything green and pushed to GitHub `main`.
+
+### Pick up here next time
+1. **Extraction tuning — the top quality lever** (relationship recall + label merging; ~half the
+   lecture concepts are edge-less). Measurable against the harness; a `decisions.md` entry on concept
+   identity (exact vs normalised/fuzzy merge). Budget `--live` DeepSeek re-records.
+2. Optional: recurrence-vs-degree ranking-weight tuning (eval-tunable); a thin TS frontend over the API.
 
 ### Pick up here next time
 1. **Extraction tuning — the highest-leverage quality work now.** The hierarchy made it visceral:

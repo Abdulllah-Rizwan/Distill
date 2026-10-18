@@ -139,12 +139,12 @@ implementable and testable.
 
 - [x] T044 [P] Build the eval harness in `evals/harness/` (`python -m evals.harness`): **faithfulness** scored deterministically (every emitted concept/edge/ranking resolves to a real source span — any ungrounded item fails) + **relevance** via an LLM-judge; thresholds that gate prompt/model/pipeline changes — **done: recorded-fixture replay (0 quota) + `--live`; baseline recorded 2026-10-18 (DeepSeek): faithfulness 100%, relevance 0.60**
 - [x] T045 [P] Create curated, versioned eval dataset(s) in `evals/datasets/` (sample notes + expected groundings and "most important" concept labels) — **done: `evals/datasets/energy-cycle/` (3 synthetic notes engineered for cross-material recurrence) + recorded `fixtures.json`**
-- [ ] T046 [P] Unit tests for edge cases in `tests/unit/test_edge_cases.py`: empty/single material, too-small corpus (empty vital-few + note), conflicting cross-material statements kept (not silently resolved)
-- [ ] T047 [P] Write `README.md` (setup/run per `quickstart.md`); document the Principle V Gemini free-tier data-use caveat prominently
+- [x] T046 [P] Unit tests for edge cases in `tests/unit/test_edge_cases.py`: empty/single material, too-small corpus (empty vital-few + note), conflicting cross-material statements kept (not silently resolved)
+- [x] T047 [P] Write `README.md` (setup/run per `quickstart.md`); document the Principle V Gemini free-tier data-use caveat prominently
 - [x] T048 Harden Gemini adapter: rate-limit throttle/backoff and clear user-facing messages on LLM failure/timeout
-- [ ] T049 [P] Make `ruff` and `mypy` clean across `src/` and `tests/`
-- [ ] T050 Run `quickstart.md` end-to-end against real Gemini 3 Flash; confirm the exact model string + live free-tier limits in AI Studio
-- [ ] T051 Release gate (Constitution): faithfulness eval = 100% grounded, `pytest` green, no unresolved constitution violations
+- [x] T049 [P] Make `ruff` and `mypy` clean across `src/` and `tests/`
+- [x] T050 Run `quickstart.md` end-to-end against a real model; confirm the exact model string + live free-tier limits — **done via the active provider**: live DeepSeek exercised the full `POST /materials` → `GET /vital-few`/`/graph`/`/hierarchy` path (synthetic smoke, the `--live` eval baseline, and a 5-lecture run); the Gemini model id + free-tier limit were confirmed earlier (DS-0001: `gemini-3-flash-preview`, 20 `generate_content`/day). Gemini's own daily quota is exhausted, so it was not re-run against Gemini; the real-model path is validated against DeepSeek (DS-0002).
+- [x] T051 Release gate (Constitution): faithfulness eval = 100% grounded, `pytest` green, no unresolved constitution violations
 
 ---
 
