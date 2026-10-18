@@ -11,18 +11,20 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from evals.harness.faithfulness import FaithfulnessResult
+from evals.harness.hierarchy import HierarchyEvalResult
 from evals.harness.relevance import RelevanceResult
 
 
 @dataclass(frozen=True, slots=True)
 class DatasetReport:
-    """The combined faithfulness + relevance outcome for one dataset."""
+    """The combined faithfulness + relevance (+ hierarchy) outcome for one dataset."""
 
     name: str
     faithfulness: FaithfulnessResult
     relevance: RelevanceResult
     min_relevance: float
     vital_few_labels: tuple[str, ...]
+    hierarchy: HierarchyEvalResult | None = None
 
     @property
     def relevance_passed(self) -> bool:
@@ -30,7 +32,8 @@ class DatasetReport:
 
     @property
     def passed(self) -> bool:
-        return self.faithfulness.passed and self.relevance_passed
+        hierarchy_ok = self.hierarchy is None or self.hierarchy.passed
+        return self.faithfulness.passed and self.relevance_passed and hierarchy_ok
 
 
 def overall_passed(reports: Sequence[DatasetReport]) -> bool:
@@ -63,6 +66,23 @@ def format_report(reports: Sequence[DatasetReport]) -> str:
             f"      vs important_concepts: precision {rel.precision:.2f}, recall {rel.recall:.2f}"
         )
         lines.append(f"      vital-few: {', '.join(r.vital_few_labels) or '(empty)'}")
+
+        if r.hierarchy is not None:
+            h = r.hierarchy
+            h_mark = "ok" if h.passed else "FAIL"
+            lines.append(
+                f"  hierarchy:    structure {h.structural_score:6.1%} "
+                f"({h.link_grounded}/{h.link_total} links on real edges), "
+                f"coverage {h.coverage_detail} [{h_mark}]"
+            )
+            for violation in h.link_violations[:5]:
+                lines.append(f"      - {violation}")
+            if len(h.link_violations) > 5:
+                lines.append(f"      ... and {len(h.link_violations) - 5} more")
+            lines.append(
+                f"      roots: {', '.join(h.pillar_labels) or '(none)'}  "
+                f"(vs important: precision {h.root_precision:.2f}, recall {h.root_recall:.2f})"
+            )
         lines.append("")
 
     overall = "PASS" if overall_passed(reports) else "FAIL"

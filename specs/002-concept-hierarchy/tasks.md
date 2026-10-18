@@ -181,12 +181,12 @@ rebuild the same corpus and get an identical tree.
 
 **Purpose**: Evals, edge cases, hardening, and the release gate.
 
-- [ ] T021 [P] Build the hierarchy eval scorer in `evals/harness/hierarchy.py`: **structural
+- [x] T021 [P] Build the hierarchy eval scorer in `evals/harness/hierarchy.py`: **structural
   faithfulness** (every parent→child link resolves to a real relationship edge — 100% or fail),
   **coverage** (every concept placed or unplaced, once), and **relevance** (roots vs the dataset's
   curated main-theme concepts; each child judged related to its parent); wire it into the harness
   report/gate alongside the existing faithfulness/relevance scorers.
-- [ ] T022 [P] Extend `evals/datasets/energy-cycle/dataset.json` with hierarchy ground truth (expected
+- [x] T022 [P] Extend `evals/datasets/energy-cycle/dataset.json` with hierarchy ground truth (expected
   root/pillar concepts and a few expected parent→child relations); re-record `fixtures.json` with
   `--live` only if needed (budget the LLM credit), then verify on replay (0 quota).
 - [x] T023 [P] Edge-case unit tests in `tests/unit/test_hierarchy_edge_cases.py`: single dominant
@@ -194,12 +194,12 @@ rebuild the same corpus and get an identical tree.
   roots + note); flat/uniform graph (shallow, wide tree — no fabricated depth) per spec Edge Cases.
 - [x] T024 [P] Make `ruff check`, `ruff format --check`, and `mypy` clean across `src`, `tests`, and
   `evals` for the new code.
-- [ ] T025 Update docs: a README section on the hierarchy endpoints; a `decisions.md` entry only if an
+- [x] T025 Update docs: a README section on the hierarchy endpoints; a `decisions.md` entry only if an
   implementation decision diverged from the plan; refresh `progress.md`.
-- [ ] T026 Run `quickstart.md` Scenario 1 (offline) + Scenario 2 (replay): confirm structural
+- [x] T026 Run `quickstart.md` Scenario 1 (offline) + Scenario 2 (replay): confirm structural
   faithfulness 100%, coverage 100%, relevance ≥ the dataset threshold, and **no regression** on feature
   001's evals (shared faithfulness gate).
-- [ ] T027 Release gate (Constitution): full `pytest` green, evals green (hierarchy structural
+- [x] T027 Release gate (Constitution): full `pytest` green, evals green (hierarchy structural
   faithfulness = 100%), ruff + mypy clean, no unresolved constitution violations; commit and push.
 
 ---

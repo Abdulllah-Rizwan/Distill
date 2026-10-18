@@ -10,6 +10,7 @@ from distil.adapters.llm.gemini._client import GeminiClient
 from distil.config import Settings
 from evals.harness.dataset import load_dataset
 from evals.harness.faithfulness import score_faithfulness
+from evals.harness.hierarchy import score_hierarchy
 from evals.harness.pipeline_run import run_pipeline
 from evals.harness.recording import (
     RecordingLLM,
@@ -52,6 +53,9 @@ def run_dataset(path: Path, *, live: bool, settings: Settings) -> DatasetReport:
         output.materials, output.concepts, output.relationships, output.entries
     )
     relevance = score_relevance(llm, dataset, output.vital_few_labels)
+    hierarchy = score_hierarchy(
+        output.materials, output.concepts, output.relationships, dataset.important_keys
+    )
 
     if recorder is not None:
         save_fixtures(fixtures_path, recorder.recorded)
@@ -62,4 +66,5 @@ def run_dataset(path: Path, *, live: bool, settings: Settings) -> DatasetReport:
         relevance=relevance,
         min_relevance=dataset.min_relevance,
         vital_few_labels=output.vital_few_labels,
+        hierarchy=hierarchy,
     )

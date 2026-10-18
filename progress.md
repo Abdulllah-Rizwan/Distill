@@ -119,15 +119,32 @@ in `decisions.md`; this file tracks *activity and todos* only.
   are `unplaced` (edge-less)** — correct (no invented links), and it shows the quality ceiling is
   **relationship extraction + label merging** ("AWS" root vs "Amazon Web Services (AWS)" unplaced).
 
+### Done today (cont.) — feature 002 COMPLETE: hierarchy eval scorer + README + release gate
+- **Hierarchy eval scorer (T021/T022):** `evals/harness/hierarchy.py` scores the built tree on
+  **structural faithfulness** (every parent→child link is a real relationship edge with a faithful
+  grounding quote — a hard gate, Principle I), **coverage** (every concept placed-or-unplaced once),
+  and **root relevance** (pillar labels vs the dataset's `important_concepts` — reused as the expected
+  themes, so no new ground truth / re-record). Wired into `DatasetReport.passed` + `format_report` and
+  the runner. Replay now reports `hierarchy: structure 100.0% (3/3 links on real edges), coverage ok`.
+- **README (T025):** documented the full API (incl. `/hierarchy`), the `LLM_PROVIDER` switch (DS-0002),
+  and the dual-provider privacy caveat. **Release gate (T027):** full pytest + evals green, ruff/mypy
+  clean.
+- **120 tests green** (+2 scorer tests); `mypy evals` clean. **All 27 feature-002 tasks done.**
+
+### State of the repo
+- **Feature 001 (concept graph + 80/20): all 3 user stories implemented**; polish T046–T051 remain.
+- **Feature 002 (concept hierarchy): COMPLETE** (US1–US3 + evals + docs + gate).
+- Everything green and pushed to GitHub `main`.
+
 ### Pick up here next time
-1. **Finish feature 002 polish:** T021/T022 (hierarchy eval scorer — structural faithfulness 100% +
-   coverage are deterministic/offline; roots-vs-curated-themes relevance needs dataset ground truth),
-   T025 (README section), T026/T027 (quickstart run + release gate).
-2. **Feature 001 polish:** T046–T051 (edge-case tests, README + Principle V caveat, adapter error
-   hardening, live-model quickstart, release gate). T044/T045 done.
-3. **Extraction tuning — now the highest-leverage quality work:** the hierarchy exposed that
-   *relationship* recall + label merging cap the tree's richness (half the lecture concepts are
-   edge-less). Measurable against the harness; re-run `--live` sparingly (DeepSeek credit).
+1. **Extraction tuning — the highest-leverage quality work now.** The hierarchy made it visceral:
+   ~half the lecture concepts are edge-less (`unplaced`) because *relationship* extraction is sparse,
+   and label merging misses variants ("AWS" vs "Amazon Web Services (AWS)"). Both are measurable
+   against the harness; budget `--live` DeepSeek re-records. Decide concept identity (exact vs
+   normalised/fuzzy) → a `decisions.md` entry.
+2. **Feature 001 polish:** T046–T051 (edge-case tests, README Principle V caveat — partly done, adapter
+   error hardening, live-model quickstart, final release gate).
+3. Optional: recurrence-vs-degree reweighting of the ranking signals (eval-tunable).
 
 ---
 
